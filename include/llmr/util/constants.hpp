@@ -9,6 +9,7 @@ namespace llmr {
 
 extern const char *kSpriteURL;
 extern const char *kVectorTileURL;
+extern const char *kRasterTileURL;
 extern const char *kGlyphURL;
 
 namespace util {

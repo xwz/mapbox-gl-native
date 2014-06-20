@@ -177,6 +177,16 @@ void Map::setup() {
                            14,
                            true)));
 
+    sources.emplace("satellite",
+                    std::unique_ptr<Source>(new Source(*this,
+                           painter,
+                           kRasterTileURL,
+                           Source::Type::raster,
+                           256,
+                           0,
+                           19,
+                           true)));
+
     setStyleJSON(styleJSON);
 }
 
