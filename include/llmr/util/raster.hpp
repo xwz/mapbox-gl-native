@@ -46,6 +46,9 @@ public:
     // texture opacity
     double opacity = 0;
 
+    // the raw pixels
+    std::unique_ptr<util::Image> img;
+
 private:
     mutable std::mutex mtx;
 
@@ -57,9 +60,6 @@ private:
 
     // min/mag filter
     uint32_t filter = 0;
-
-    // the raw pixels
-    std::unique_ptr<util::Image> img;
 
     // fade in transition
     std::shared_ptr<util::transition> fade_transition = nullptr;
