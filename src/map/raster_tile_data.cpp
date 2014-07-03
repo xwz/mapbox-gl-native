@@ -7,7 +7,8 @@ using namespace llmr;
 
 RasterTileData::RasterTileData(Tile::ID id, Map &map, const std::string url)
     : TileData(id, map, url),
-    bucket(map.getTexturepool()) {
+    bucket(map.getRasterTileAtlas(), map.getTexturepool()),
+    id(id) {
 }
 
 RasterTileData::~RasterTileData() {
@@ -19,6 +20,7 @@ void RasterTileData::parse() {
     }
 
     if (bucket.setImage(data)) {
+        bucket.addToTextureAtlas(id);
         state = State::parsed;
     } else {
         state = State::invalid;

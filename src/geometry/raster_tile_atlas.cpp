@@ -18,14 +18,14 @@ RasterTileAtlas::~RasterTileAtlas() {
     delete[] data;
 }
 
-Rect<uint16_t> RasterTileAtlas::addTile(const char *source_url, const Tile::ID& tile_id, const Raster& raster) {
+Rect<uint16_t> RasterTileAtlas::addTile(const std::string& source_url, const uint64_t tile_id, const Raster& raster) {
     std::lock_guard<std::mutex> lock(mtx);
 
-    std::map<Tile::ID, RasterTileValue>& tiles = index[source_url];
-    std::map<Tile::ID, RasterTileValue>::iterator it = tiles.find(tile_id);
+    std::map<uint64_t, RasterTileValue>& source_tiles = index[source_url];
+    std::map<uint64_t, RasterTileValue>::iterator it = source_tiles.find(tile_id);
 
     // The tile is already in this texture.
-    if (it != tiles.end()) {
+    if (it != source_tiles.end()) {
         RasterTileValue& value = it->second;
         return value.rect;
     }
@@ -57,7 +57,7 @@ Rect<uint16_t> RasterTileAtlas::addTile(const char *source_url, const Tile::ID& 
     assert(rect.x + rect.w <= width);
     assert(rect.y + rect.h <= height);
 
-    tiles.emplace(tile_id, RasterTileValue { rect });
+    source_tiles.emplace(tile_id, RasterTileValue { rect });
 
     // Copy the bitmap
     char *target = data;
@@ -75,13 +75,13 @@ Rect<uint16_t> RasterTileAtlas::addTile(const char *source_url, const Tile::ID& 
     return rect;
 }
 
-void RasterTileAtlas::removeTile(const char *source_url, const Tile::ID& tile_id) {
+void RasterTileAtlas::removeTile(const std::string& source_url, const uint64_t tile_id) {
     std::lock_guard<std::mutex> lock(mtx);
 
-    std::map<Tile::ID, RasterTileValue>& tiles = index[source_url];
-    std::map<Tile::ID, RasterTileValue>::iterator it = tiles.find(tile_id);
+    std::map<uint64_t, RasterTileValue>& source_tiles = index[source_url];
+    std::map<uint64_t, RasterTileValue>::iterator it = source_tiles.find(tile_id);
 
-    if (it != tiles.end()) {
+    if (it != source_tiles.end()) {
         RasterTileValue& value = it->second;
 
         const Rect<uint16_t>& rect = value.rect;
@@ -99,25 +99,27 @@ void RasterTileAtlas::removeTile(const char *source_url, const Tile::ID& tile_id
 
         bin.release(rect);
 
-        tiles.erase(tile_id);
+        source_tiles.erase(tile_id);
     }
 }
 
-void RasterTileAtlas::bind() {
-    if (!texture) {
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    } else {
-        glBindTexture(GL_TEXTURE_2D, texture);
-    }
+void RasterTileAtlas::bind(Rect<uint16_t> rect) {
+    if (rect) {
+        if (!texture) {
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, texture);
+        }
 
-    if (dirty) {
-        std::lock_guard<std::mutex> lock(mtx);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
-        dirty = false;
+        if (dirty) {
+            std::lock_guard<std::mutex> lock(mtx);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, rect.w /*width*/, rect.h /*height*/, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+            dirty = false;
+        }
     }
 };

@@ -21,6 +21,9 @@ public:
 
 protected:
     RasterBucket bucket;
+
+private:
+    Tile::ID id;
 };
 
 }

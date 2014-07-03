@@ -26,9 +26,9 @@ namespace llmr {
         RasterTileAtlas(uint16_t width, uint16_t height);
         ~RasterTileAtlas();
 
-        Rect<uint16_t> addTile(const char *source_url, const Tile::ID& tile_id, const Raster& raster);
-        void removeTile(const char *source_url, const Tile::ID& tile_id);
-        void bind();
+        Rect<uint16_t> addTile(const std::string& source_url, const uint64_t tile_id, const Raster& raster);
+        void removeTile(const std::string& source_url, const uint64_t tile_id);
+        void bind(Rect<uint16_t> rect);
 
     public:
         const uint16_t width = 0;
@@ -37,7 +37,7 @@ namespace llmr {
     private:
         std::mutex mtx;
         BinPack<uint16_t> bin;
-        std::map<const char *, std::map<Tile::ID, RasterTileValue>> index;
+        std::map<std::string, std::map<uint64_t, RasterTileValue>> index;
         char *const data = nullptr;
         std::atomic<bool> dirty;
         uint32_t texture = 0;
