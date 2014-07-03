@@ -4,14 +4,14 @@
 
 using namespace llmr;
 
-
 RasterTileData::RasterTileData(Tile::ID id, Map &map, const std::string url)
     : TileData(id, map, url),
-    bucket(map.getRasterTileAtlas(), map.getTexturepool()),
+    bucket(),
     id(id) {
 }
 
 RasterTileData::~RasterTileData() {
+    map.getRasterTileAtlas()->removeTile("test", id.to_uint64());
 }
 
 void RasterTileData::parse() {
@@ -20,7 +20,7 @@ void RasterTileData::parse() {
     }
 
     if (bucket.setImage(data)) {
-        bucket.addToTextureAtlas(id);
+        map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
         state = State::parsed;
     } else {
         state = State::invalid;
@@ -28,6 +28,8 @@ void RasterTileData::parse() {
 }
 
 void RasterTileData::render(Painter &painter, const LayerDescription& layer_desc) {
+    Rect<uint16_t> rect = map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
+    map.getRasterTileAtlas()->bind(rect);
     bucket.render(painter, layer_desc.name, id);
 }
 

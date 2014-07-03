@@ -12,7 +12,6 @@
 #include <llmr/geometry/raster_tile_atlas.hpp>
 #include <llmr/renderer/painter.hpp>
 #include <llmr/util/noncopyable.hpp>
-#include <llmr/util/texturepool.hpp>
 
 #include <cstdint>
 #include <string>
@@ -107,7 +106,6 @@ public:
     inline std::shared_ptr<GlyphStore> getGlyphStore() { return glyphStore; }
     inline std::shared_ptr<SpriteAtlas> getSpriteAtlas() { return spriteAtlas; }
     inline std::shared_ptr<RasterTileAtlas> getRasterTileAtlas() { return rasterTileAtlas; }
-    inline std::shared_ptr<Texturepool> getTexturepool() { return texturepool; }
     inline std::shared_ptr<uv::loop> getLoop() { return loop; }
     inline time getAnimationTime() const { return animationTime; }
     inline const Sources &getSources() { return sources; }
@@ -161,7 +159,6 @@ private:
     std::shared_ptr<GlyphStore> glyphStore;
     std::shared_ptr<SpriteAtlas> spriteAtlas;
     std::shared_ptr<RasterTileAtlas> rasterTileAtlas;
-    std::shared_ptr<Texturepool> texturepool;
 
     Painter painter;
 

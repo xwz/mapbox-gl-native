@@ -2,7 +2,6 @@
 #define LLMR_GEOMETRY_RASTER_TILE_ATLAS
 
 #include <llmr/geometry/binpack.hpp>
-#include <llmr/map/tile.hpp>
 #include <llmr/util/raster.hpp>
 
 #include <string>
@@ -12,9 +11,7 @@
 
 namespace llmr {
 
-    class RasterTileAtlas {
-    public:
-
+class RasterTileAtlas {
     private:
         struct RasterTileValue {
             RasterTileValue(const Rect<uint16_t>& rect)

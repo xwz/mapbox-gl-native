@@ -19,7 +19,6 @@ namespace llmr {
 class Map;
 class TransformState;
 class Painter;
-class Texturepool;
 
 class Source : public std::enable_shared_from_this<Source>, private util::noncopyable {
 public:

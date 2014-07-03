@@ -2,7 +2,6 @@
 #define LLMR_UTIL_RASTER
 
 #include <llmr/util/transition.hpp>
-#include <llmr/util/texturepool.hpp>
 #include <llmr/util/image.hpp>
 
 #include <string>
@@ -16,14 +15,11 @@ namespace llmr {
 class Raster : public std::enable_shared_from_this<Raster> {
 
 public:
-    Raster(const std::shared_ptr<Texturepool> &texturepool);
+    Raster();
     ~Raster();
 
     // load image data
     bool load(const std::string &img);
-
-    // bind current texture
-    void bind(bool linear = false);
 
     // loaded status
     bool isLoaded() const;
@@ -37,12 +33,6 @@ public:
     // loaded image dimensions
     uint32_t width = 0, height = 0;
 
-    // has been uploaded to texture
-    bool textured = false;
-
-    // the uploaded texture
-    uint32_t texture = 0;
-
     // texture opacity
     double opacity = 0;
 
@@ -54,12 +44,6 @@ private:
 
     // raw pixels have been loaded
     bool loaded = false;
-
-    // shared texture pool
-    std::shared_ptr<Texturepool> texturepool;
-
-    // min/mag filter
-    uint32_t filter = 0;
 
     // fade in transition
     std::shared_ptr<util::transition> fade_transition = nullptr;

@@ -1,5 +1,6 @@
 #include <llmr/geometry/raster_tile_atlas.hpp>
 #include <llmr/platform/gl.hpp>
+#include <llmr/platform/platform.hpp>
 #include <llmr/util/image.hpp>
 
 #include <cassert>
@@ -59,6 +60,10 @@ Rect<uint16_t> RasterTileAtlas::addTile(const std::string& source_url, const uin
 
     source_tiles.emplace(tile_id, RasterTileValue { rect });
 
+#if defined(DEBUG)
+    platform::show_debug_image("Raster Tile Atlas", data, width, height);
+#endif
+
     // Copy the bitmap
     char *target = data;
     const char *source = raster.img->getData();
@@ -69,6 +74,10 @@ Rect<uint16_t> RasterTileAtlas::addTile(const std::string& source_url, const uin
             target[y1 + x] = source[y2 + x];
         }
     }
+
+#if defined(DEBUG)
+    platform::show_debug_image("Raster Tile Atlas", data, width, height);
+#endif
 
     dirty = true;
 
@@ -104,7 +113,7 @@ void RasterTileAtlas::removeTile(const std::string& source_url, const uint64_t t
 }
 
 void RasterTileAtlas::bind(Rect<uint16_t> rect) {
-    if (rect) {
+    if (rect.w && rect.h) {
         if (!texture) {
             glGenTextures(1, &texture);
             glBindTexture(GL_TEXTURE_2D, texture);
@@ -116,10 +125,17 @@ void RasterTileAtlas::bind(Rect<uint16_t> rect) {
             glBindTexture(GL_TEXTURE_2D, texture);
         }
 
-        if (dirty) {
-            std::lock_guard<std::mutex> lock(mtx);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, rect.w /*width*/, rect.h /*height*/, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
-            dirty = false;
-        }
+//        if (dirty) {
+//            std::lock_guard<std::mutex> lock(mtx);
+//            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+//            dirty = false;
+//        }
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x, rect.y, rect.w, rect.h, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+
+#if defined(DEBUG)
+        platform::show_debug_image("Raster Tile Atlas", data, width, height);
+#endif
+
     }
 };

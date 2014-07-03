@@ -2,9 +2,7 @@
 #define LLMR_MAP_RASTER_TILE_DATA
 
 #include <llmr/map/tile_data.hpp>
-
 #include <llmr/renderer/raster_bucket.hpp>
-
 
 namespace llmr {
 

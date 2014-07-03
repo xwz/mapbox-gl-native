@@ -5,7 +5,6 @@
 #include <llmr/util/constants.hpp>
 #include <llmr/util/raster.hpp>
 #include <llmr/util/string.hpp>
-#include <llmr/util/texturepool.hpp>
 #include <llmr/util/vec.hpp>
 #include <llmr/util/std.hpp>
 #include <llmr/geometry/glyph_atlas.hpp>

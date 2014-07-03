@@ -24,7 +24,6 @@ Map::Map(View& view)
       glyphStore(std::make_shared<GlyphStore>()),
       spriteAtlas(std::make_shared<SpriteAtlas>(512, 512)),
       rasterTileAtlas(std::make_shared<RasterTileAtlas>(2048, 2048)),
-      texturepool(std::make_shared<Texturepool>()),
       painter(*this),
       loop(std::make_shared<uv::loop>()) {
 
