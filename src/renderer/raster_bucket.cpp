@@ -1,9 +1,7 @@
-#include <llmr/renderer/raster_bucket.hpp>
-#include <llmr/renderer/painter.hpp>
-#include <llmr/map/tile.hpp>
-#include <llmr/util/rect.hpp>
+#include <mbgl/renderer/raster_bucket.hpp>
+#include <mbgl/renderer/painter.hpp>
 
-using namespace llmr;
+using namespace mbgl;
 
 RasterBucket::RasterBucket()
     : raster() {
@@ -12,8 +10,8 @@ RasterBucket::RasterBucket()
 RasterBucket::~RasterBucket() {
 }
 
-void RasterBucket::render(Painter &painter, const std::string &layer_name, const Tile::ID &id) {
-    painter.renderRaster(*this, layer_name, id);
+void RasterBucket::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc, const Tile::ID &id) {
+    painter.renderRaster(*this, layer_desc, id);
 }
 
 bool RasterBucket::setImage(const std::string &data) {

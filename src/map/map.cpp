@@ -1,27 +1,37 @@
-#include <llmr/map/map.hpp>
-#include <llmr/map/source.hpp>
-#include <llmr/platform/platform.hpp>
-#include <llmr/style/sprite.hpp>
-#include <llmr/util/transition.hpp>
-#include <llmr/util/time.hpp>
-#include <llmr/util/math.hpp>
-#include <llmr/util/clip_ids.hpp>
-#include <llmr/util/string.hpp>
-#include <llmr/util/constants.hpp>
-#include <llmr/util/uv.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/map/source.hpp>
+#include <mbgl/map/view.hpp>
+#include <mbgl/platform/platform.hpp>
+#include <mbgl/map/sprite.hpp>
+#include <mbgl/util/transition.hpp>
+#include <mbgl/util/time.hpp>
+#include <mbgl/util/math.hpp>
+#include <mbgl/util/clip_ids.hpp>
+#include <mbgl/util/string.hpp>
+#include <mbgl/util/constants.hpp>
+#include <mbgl/util/uv.hpp>
+#include <mbgl/util/std.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/text/glyph_store.hpp>
+#include <mbgl/geometry/glyph_atlas.hpp>
+#include <mbgl/style/style_layer_group.hpp>
+#include <mbgl/style/style_bucket.hpp>
+#include <mbgl/geometry/sprite_atlas.hpp>
 
 #include <algorithm>
 #include <memory>
 #include <iostream>
 
-using namespace llmr;
+#define _USE_MATH_DEFINES
+#include <cmath>
+
+using namespace mbgl;
 
 Map::Map(View& view)
     : view(view),
-      transform(),
+      transform(view),
       style(std::make_shared<Style>()),
       glyphAtlas(std::make_shared<GlyphAtlas>(1024, 1024)),
-      glyphStore(std::make_shared<GlyphStore>()),
       spriteAtlas(std::make_shared<SpriteAtlas>(512, 512)),
       rasterTileAtlas(std::make_shared<RasterTileAtlas>(2048, 2048)),
       painter(*this),
@@ -36,6 +46,10 @@ Map::Map(View& view)
 }
 
 Map::~Map() {
+    // Clear the style first before the rest of the constructor deletes members of this object.
+    // This is required because members of the style reference the Map object in their destructors.
+    style.reset();
+
     if (async) {
         stop();
     }
@@ -72,13 +86,6 @@ void Map::stop() {
 
     uv_thread_join(&thread);
 
-    uv_close((uv_handle_t *)async_terminate, delete_async);
-    async_terminate = nullptr;
-    uv_close((uv_handle_t *)async_render, delete_async);
-    async_render = nullptr;
-    uv_close((uv_handle_t *)async_cleanup, delete_async);
-    async_cleanup = nullptr;
-
     // Run the event loop once to make sure our async delete handlers are called.
     uv_run(**loop, UV_RUN_ONCE);
 
@@ -97,6 +104,7 @@ void Map::run() {
     // If the map rendering wasn't started asynchronously, we perform one render
     // *after* all events have been processed.
     if (!async) {
+        prepare();
         render();
     }
 }
@@ -157,7 +165,13 @@ void Map::render(uv_async_t *async) {
 }
 
 void Map::terminate(uv_async_t *async) {
-    uv_stop(static_cast<uv_loop_t *>(async->data));
+    // Closes all open handles on the loop. This means that the loop will automatically terminate.
+    uv_loop_t *loop = static_cast<uv_loop_t *>(async->data);
+    uv_walk(loop, [](uv_handle_t *handle, void *arg) {
+        if (!uv_is_closing(handle)) {
+            uv_close(handle, NULL);
+        }
+    }, NULL);
 }
 
 #pragma mark - Setup
@@ -166,39 +180,24 @@ void Map::setup() {
     view.make_active();
 
     painter.setup();
-
-    sources.emplace("outdoors",
-                    std::unique_ptr<Source>(new Source(*this,
-                           painter,
-                           kVectorTileURL,
-                           Source::Type::vector,
-                           512,
-                           0,
-                           14,
-                           true)));
-
-    sources.emplace("satellite",
-                    std::unique_ptr<Source>(new Source(*this,
-                           painter,
-                           kRasterTileURL,
-                           Source::Type::raster,
-                           256,
-                           0,
-                           19,
-                           true)));
-
-    setStyleJSON(styleJSON);
 }
 
 void Map::setStyleJSON(std::string newStyleJSON) {
     styleJSON.swap(newStyleJSON);
-    style->cancelTransitions();
     style->loadJSON((const uint8_t *)styleJSON.c_str());
     update();
 }
 
 std::string Map::getStyleJSON() const {
     return styleJSON;
+}
+
+void Map::setAccessToken(std::string access_token) {
+    accessToken.swap(access_token);
+}
+
+std::string Map::getAccessToken() const {
+    return accessToken;
 }
 
 #pragma mark - Size
@@ -341,20 +340,20 @@ void Map::rotateBy(double sx, double sy, double ex, double ey, double duration) 
 }
 
 // Note: This function is called from another thread. Make sure you only call threadsafe functions!
-void Map::setAngle(double angle, double duration) {
-    transform.setAngle(angle, duration * 1_second);
+void Map::setBearing(double degrees, double duration) {
+    transform.setAngle(-degrees * M_PI / 180, duration * 1_second);
     update();
 }
 
 // Note: This function is called from another thread. Make sure you only call threadsafe functions!
-void Map::setAngle(double angle, double cx, double cy) {
-    transform.setAngle(angle, cx, cy);
+void Map::setBearing(double degrees, double cx, double cy) {
+    transform.setAngle(-degrees * M_PI / 180, cx, cy);
     update();
 }
 
 // Note: This function is called from another thread. Make sure you only call threadsafe functions!
-double Map::getAngle() const {
-    return transform.getAngle();
+double Map::getBearing() const {
+    return -transform.getAngle() / M_PI * 180;
 }
 
 // Note: This function is called from another thread. Make sure you only call threadsafe functions!
@@ -396,49 +395,93 @@ bool Map::getDebug() const {
     return debug;
 }
 
-void Map::setAppliedClasses(std::set<std::string> appliedClasses) {
-    style->cancelTransitions();
-
-    style->appliedClasses.swap(appliedClasses);
-
-    update();
+void Map::setAppliedClasses(const std::vector<std::string> &classes) {
+    style->setAppliedClasses(classes);
+    if (style->hasTransitions()) {
+        update();
+    }
 }
 
-std::set<std::string> Map::getAppliedClasses() const {
-    return style->appliedClasses;
+
+void Map::toggleClass(const std::string &name) {
+    style->toggleClass(name);
+    if (style->hasTransitions()) {
+        update();
+    }
+}
+
+const std::vector<std::string> &Map::getAppliedClasses() const {
+   return style->getAppliedClasses();
 }
 
 void Map::setDefaultTransitionDuration(uint64_t duration_milliseconds) {
     style->setDefaultTransitionDuration(duration_milliseconds);
 }
 
-void Map::updateTiles() {
-    for (auto &pair : sources) {
-        const std::unique_ptr<Source> &source = pair.second;
-        if (source->enabled) {
-            source->update();
+void Map::updateSources() {
+    // First, disable all existing sources.
+    for (const std::shared_ptr<StyleSource> &source : activeSources) {
+        source->enabled = false;
+    }
+
+    // Then, reenable all of those that we actually use when drawing this layer.
+    updateSources(style->layers);
+
+    // Then, construct or destroy the actual source object, depending on enabled state.
+    for (const std::shared_ptr<StyleSource> &style_source : activeSources) {
+        if (style_source->enabled) {
+            if (!style_source->source) {
+                style_source->source = std::make_shared<Source>(style_source->info, getAccessToken());
+            }
+        } else {
+            style_source->source.reset();
         }
+    }
+
+    // Finally, remove all sources that are disabled.
+    util::erase_if(activeSources, [](std::shared_ptr<StyleSource> source){
+        return !source->enabled;
+    });
+}
+
+const std::set<std::shared_ptr<StyleSource>> Map::getActiveSources() const {
+    return activeSources;
+}
+
+void Map::updateSources(const std::shared_ptr<StyleLayerGroup> &group) {
+    if (!group) {
+        return;
+    }
+    for (const std::shared_ptr<StyleLayer> &layer : group->layers) {
+        if (!layer) continue;
+        if (layer->bucket) {
+            if (layer->bucket->style_source) {
+                (*activeSources.emplace(layer->bucket->style_source).first)->enabled = true;
+            }
+        } else if (layer->layers) {
+            updateSources(layer->layers);
+        }
+    }
+}
+
+void Map::updateTiles() {
+    for (const std::shared_ptr<StyleSource> &source : getActiveSources()) {
+        source->source->update(*this);
     }
 }
 
 void Map::updateRenderState() {
     std::forward_list<Tile::ID> ids;
 
-    for (const auto &pair : sources) {
-        Source &source = *pair.second;
-        if (source.enabled) {
-            ids.splice_after(ids.before_begin(), source.getIDs());
-            source.updateMatrices(state);
-        }
+    for (const std::shared_ptr<StyleSource> &source : getActiveSources()) {
+        ids.splice_after(ids.before_begin(), source->source->getIDs());
+        source->source->updateMatrices(painter.projMatrix, state);
     }
 
     const std::map<Tile::ID, ClipID> clipIDs = computeClipIDs(ids);
 
-    for (const auto &pair : sources) {
-        Source &source = *pair.second;
-        if (source.enabled) {
-            source.updateClipIDs(clipIDs);
-        }
+    for (const std::shared_ptr<StyleSource> &source : getActiveSources()) {
+        source->source->updateClipIDs(clipIDs);
     }
 }
 
@@ -460,23 +503,29 @@ void Map::prepare() {
 
     if (pixelRatioChanged) {
         style->sprite = std::make_shared<Sprite>(*this, state.getPixelRatio());
-        style->sprite->load(kSpriteURL);
-
+        if (style->sprite_url.size()) {
+            style->sprite->load(style->sprite_url);
+        }
         spriteAtlas->resize(state.getPixelRatio());
+    }
+
+    // Create a new glyph store object in case the glyph URL changed.
+    // TODO: Move this to a less frequently called place; we only need to do this when the
+    // stylesheet changes.
+    if (glyphStore && glyphStore->glyphURL != style->glyph_url) {
+        glyphStore.reset();
+    }
+    if (!glyphStore && style->glyph_url.size()) {
+        glyphStore = std::make_shared<GlyphStore>(style->glyph_url);
     }
 
     if (pixelRatioChanged || dimensionsChanged) {
         painter.clearFramebuffers();
     }
 
-    style->cascade(state.getNormalizedZoom());
-
-    // Update style transitions.
     animationTime = util::now();
-    if (style->needsTransition()) {
-        style->updateTransitions(animationTime);
-        update();
-    }
+    updateSources();
+    style->updateProperties(state.getNormalizedZoom(), animationTime);
 
     // Allow the sprite atlas to potentially pull new sprite images if needed.
     if (style->sprite && style->sprite->isLoaded()) {
@@ -500,18 +549,8 @@ void Map::render() {
 
     updateRenderState();
 
-    painter.drawClippingMasks(sources);
+    painter.drawClippingMasks(getActiveSources());
 
-#if defined(DEBUG)
-    // Generate debug information
-    size_t source_id = 0;
-    for (const auto &pair : sources) {
-        const Source &source = *pair.second;
-        size_t count = source.getTileCount();
-        debug.emplace_back(util::sprintf<100>("source %d: %d\n", source_id, count));
-        source_id++;
-    }
-#endif
     // Actually render the layers
     if (debug::renderTree) { std::cout << "{" << std::endl; indent++; }
     renderLayers(style->layers);
@@ -521,30 +560,26 @@ void Map::render() {
     // This guarantees that we have at least one function per tile called.
     // When only rendering layers via the stylesheet, it's possible that we don't
     // ever visit a tile during rendering.
-    for (const auto &pair : sources) {
-        Source &source = *pair.second;
-        const std::string &name = pair.first;
-        gl::group group(std::string("debug ") + name);
-        source.finishRender();
+    for (const std::shared_ptr<StyleSource> &source : getActiveSources()) {
+        source->source->finishRender(painter);
     }
 
-    painter.renderMatte();
-
-#if defined(DEBUG)
-    painter.renderDebugText(debug);
-#endif
-
     // Schedule another rerender when we definitely need a next frame.
-    if (transform.needsTransition()) {
+    if (transform.needsTransition() || style->hasTransitions()) {
         update();
     }
 
     glFlush();
 }
 
-void Map::renderLayers(const std::vector<LayerDescription>& layers) {
+void Map::renderLayers(std::shared_ptr<StyleLayerGroup> group) {
+    if (!group) {
+        // Make sure that we actually do have a layer group.
+        return;
+    }
+
     // TODO: Correctly compute the number of layers recursively beforehand.
-    float strata_thickness = 1.0f / (layers.size() + 1);
+    float strata_thickness = 1.0f / (group->layers.size() + 1);
 
     // - FIRST PASS ------------------------------------------------------------
     // Render everything top-to-bottom by using reverse iterators. Render opaque
@@ -553,9 +588,8 @@ void Map::renderLayers(const std::vector<LayerDescription>& layers) {
     if (debug::renderTree) {
         std::cout << std::string(indent++ * 4, ' ') << "OPAQUE {" << std::endl;
     }
-    typedef std::vector<LayerDescription>::const_reverse_iterator riterator;
     int i = 0;
-    for (riterator it = layers.rbegin(), end = layers.rend(); it != end; ++it, ++i) {
+    for (auto it = group->layers.rbegin(), end = group->layers.rend(); it != end; ++it, ++i) {
         painter.setOpaque();
         painter.setStrata(i * strata_thickness);
         renderLayer(*it, Opaque);
@@ -570,9 +604,8 @@ void Map::renderLayers(const std::vector<LayerDescription>& layers) {
     if (debug::renderTree) {
         std::cout << std::string(indent++ * 4, ' ') << "TRANSLUCENT {" << std::endl;
     }
-    typedef std::vector<LayerDescription>::const_iterator iterator;
     --i;
-    for (iterator it = layers.begin(), end = layers.end(); it != end; ++it, --i) {
+    for (auto it = group->layers.begin(), end = group->layers.end(); it != end; ++it, --i) {
         painter.setTranslucent();
         painter.setStrata(i * strata_thickness);
         renderLayer(*it, Translucent);
@@ -582,48 +615,22 @@ void Map::renderLayers(const std::vector<LayerDescription>& layers) {
     }
 }
 
-template <typename Styles>
-typename Styles::const_iterator find_style(const Styles &styles, const LayerDescription &layer_desc) {
-    auto it = styles.find(layer_desc.name);
-#if defined(DEBUG)
-    if (it == styles.end()) {
-        if (debug::renderWarnings) {
-            fprintf(stderr, "[WARNING] can't find class named '%s' in style\n",
-                    layer_desc.name.c_str());
-        }
-    }
-#endif
-    return it;
-}
-
-template <typename Styles>
-bool is_invisible(const Styles &styles, const LayerDescription &layer_desc) {
-    auto it = find_style(styles, layer_desc);
-    if (it == styles.end()) {
-        // We don't have a style, so we fall back to the default style which is
-        // always visible.
-        return false;
-    }
-    return !it->second.isVisible();
-}
-
-void Map::renderLayer(const LayerDescription& layer_desc, RenderPass pass) {
-    if (layer_desc.child_layer.size()) {
+void Map::renderLayer(std::shared_ptr<StyleLayer> layer_desc, RenderPass pass) {
+    if (layer_desc->layers) {
         // This is a layer group. We render them during our translucent render pass.
         if (pass == Translucent) {
-            auto it = find_style(style->computed.composites, layer_desc);
-            const CompositeProperties &properties = (it != style->computed.composites.end()) ? it->second : defaultCompositeProperties;
+            const CompositeProperties &properties = layer_desc->getProperties<CompositeProperties>();
             if (properties.isVisible()) {
-                gl::group group(std::string("group: ") + layer_desc.name);
+                gl::group group(std::string("group: ") + layer_desc->id);
 
                 if (debug::renderTree) {
-                    std::cout << std::string(indent++ * 4, ' ') << "+ " << layer_desc.name
+                    std::cout << std::string(indent++ * 4, ' ') << "+ " << layer_desc->id
                               << " (Composite) {" << std::endl;
                 }
 
                 painter.pushFramebuffer();
 
-                renderLayers(layer_desc.child_layer);
+                renderLayers(layer_desc->layers);
 
                 GLuint texture = painter.popFramebuffer();
 
@@ -635,63 +642,67 @@ void Map::renderLayer(const LayerDescription& layer_desc, RenderPass pass) {
                 }
             }
         }
-    } else if (layer_desc.bucket_name == "background") {
+    } else if (layer_desc->id == "background") {
         // This layer defines the background color.
     } else {
-        // This is a singular layer. Try to find the bucket associated with
-        // this layer and render it.
-
-        auto bucket_it = style->buckets.find(layer_desc.bucket_name);
-        if (bucket_it != style->buckets.end()) {
-            const BucketDescription &bucket_desc = bucket_it->second;
-
-            // Abort early if we can already deduce from the bucket type that
-            // we're not going to render anything anyway during this pass.
-            switch (bucket_desc.type) {
-                case BucketType::Fill:
-                    if (is_invisible(style->computed.fills, layer_desc)) return;
-                    break;
-                case BucketType::Line:
-                    if (pass == Opaque) return;
-                    if (is_invisible(style->computed.lines, layer_desc)) return;
-                    break;
-                case BucketType::Icon:
-                    if (pass == Opaque) return;
-                    if (is_invisible(style->computed.icons, layer_desc)) return;
-                    break;
-                case BucketType::Text:
-                    if (pass == Opaque) return;
-                    if (is_invisible(style->computed.texts, layer_desc)) return;
-                    break;
-                case BucketType::Raster:
-                    if (pass == Translucent) return;
-                    if (is_invisible(style->computed.rasters, layer_desc)) return;
-                    break;
-                default:
-                    break;
-            }
-
-            // Find the source and render all tiles in it.
-            auto source_it = sources.find(bucket_desc.source_name);
-            if (source_it != sources.end()) {
-                if (debug::renderTree) {
-                    std::cout << std::string(indent * 4, ' ') << "- " << layer_desc.name << " ("
-                              << bucket_desc.type << ")" << std::endl;
-                }
-
-                const std::unique_ptr<Source> &source = source_it->second;
-                source->render(layer_desc, bucket_desc);
-            } else {
-                if (debug::renderWarnings) {
-                    fprintf(stderr, "[WARNING] can't find source '%s' required for bucket '%s'\n",
-                            bucket_desc.source_name.c_str(), layer_desc.bucket_name.c_str());
-                }
-            }
-        } else {
-            if (debug::renderWarnings) {
-                fprintf(stderr, "[WARNING] can't find bucket '%s' required for layer '%s'\n",
-                        layer_desc.bucket_name.c_str(), layer_desc.name.c_str());
-            }
+        // This is a singular layer.
+        if (!layer_desc->bucket) {
+            fprintf(stderr, "[WARNING] layer '%s' is missing bucket\n", layer_desc->id.c_str());
+            return;
         }
+
+        if (!layer_desc->bucket->style_source) {
+            fprintf(stderr, "[WARNING] can't find source for layer '%s'\n", layer_desc->id.c_str());
+            return;
+        }
+
+        StyleSource &style_source = *layer_desc->bucket->style_source;
+
+        // Skip this layer if there is no data.
+        if (!style_source.source) {
+            return;
+        }
+
+        // Skip this layer if it's outside the range of min/maxzoom.
+        // This may occur when there /is/ a bucket created for this layer, but the min/max-zoom
+        // is set to a fractional value, or value that is larger than the source maxzoom.
+        const double zoom = state.getZoom();
+        if (layer_desc->bucket->min_zoom > zoom ||
+            layer_desc->bucket->max_zoom <= zoom) {
+            return;
+        }
+
+        // Abort early if we can already deduce from the bucket type that
+        // we're not going to render anything anyway during this pass.
+        switch (layer_desc->type) {
+            case StyleLayerType::Fill:
+                if (!layer_desc->getProperties<FillProperties>().isVisible()) return;
+                break;
+            case StyleLayerType::Line:
+                if (pass == Opaque) return;
+                if (!layer_desc->getProperties<LineProperties>().isVisible()) return;
+                break;
+            case StyleLayerType::Icon:
+                if (pass == Opaque) return;
+                if (!layer_desc->getProperties<IconProperties>().isVisible()) return;
+                break;
+            case StyleLayerType::Text:
+                if (pass == Opaque) return;
+                if (!layer_desc->getProperties<TextProperties>().isVisible()) return;
+                break;
+            case StyleLayerType::Raster:
+                if (pass == Translucent) return;
+                if (!layer_desc->getProperties<RasterProperties>().isVisible()) return;
+                break;
+            default:
+                break;
+        }
+
+        if (debug::renderTree) {
+            std::cout << std::string(indent * 4, ' ') << "- " << layer_desc->id << " ("
+                      << layer_desc->type << ")" << std::endl;
+        }
+
+        style_source.source->render(painter, layer_desc);
     }
 }

@@ -1,20 +1,24 @@
-#include <llmr/map/transform.hpp>
-#include <llmr/util/constants.hpp>
-#include <llmr/util/mat4.hpp>
-#include <llmr/util/std.hpp>
-#include <llmr/util/math.hpp>
-#include <llmr/util/time.hpp>
-#include <llmr/platform/platform.hpp>
+#include <mbgl/map/transform.hpp>
+#include <mbgl/map/view.hpp>
+#include <mbgl/util/constants.hpp>
+#include <mbgl/util/mat4.hpp>
+#include <mbgl/util/std.hpp>
+#include <mbgl/util/math.hpp>
+#include <mbgl/util/time.hpp>
+#include <mbgl/util/transition.hpp>
+#include <mbgl/platform/platform.hpp>
 #include <cstdio>
 
-using namespace llmr;
+using namespace mbgl;
 
 const double D2R = M_PI / 180.0;
 const double R2D = 180.0 / M_PI;
 const double M2PI = 2 * M_PI;
 const double MIN_ROTATE_SCALE = 8;
 
-Transform::Transform() {
+Transform::Transform(View &view)
+    : view(view) {
+
     setScale(current.scale);
     setAngle(current.angle);
 }
@@ -28,6 +32,8 @@ bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
     if (final.width != w || final.height != h || final.pixelRatio != ratio ||
         final.framebuffer[0] != fb_w || final.framebuffer[1] != fb_h) {
 
+        view.notify_map_change(MapChangeRegionWillChange);
+
         current.width = final.width = w;
         current.height = final.height = h;
         current.pixelRatio = final.pixelRatio = ratio;
@@ -35,7 +41,9 @@ bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
         current.framebuffer[1] = final.framebuffer[1] = fb_h;
         if (!canRotate() && current.angle) _setAngle(0);
         constrain(current.scale, current.y);
-        platform::notify_map_change();
+
+        view.notify_map_change(MapChangeRegionDidChange);
+
         return true;
     } else {
         return false;
@@ -44,14 +52,18 @@ bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
 
 #pragma mark - Position
 
-void Transform::moveBy(const double dx, const double dy, const time duration) {
+void Transform::moveBy(const double dx, const double dy, const timestamp duration) {
     uv::writelock lock(mtx);
 
     _moveBy(dx, dy, duration);
 }
 
-void Transform::_moveBy(const double dx, const double dy, const time duration) {
+void Transform::_moveBy(const double dx, const double dy, const timestamp duration) {
     // This is only called internally, so we don't need a lock here.
+
+    view.notify_map_change(duration ?
+                           MapChangeRegionWillChangeAnimated :
+                           MapChangeRegionWillChange);
 
     final.x = current.x + std::cos(current.angle) * dx + std::sin(current.angle) * dy;
     final.y = current.y + std::cos(current.angle) * dy + std::sin(-current.angle) * dx;
@@ -69,17 +81,20 @@ void Transform::_moveBy(const double dx, const double dy, const time duration) {
         current.y = final.y;
     } else {
         // Use a common start time for all of the transitions to avoid divergent transitions.
-        time start = util::now();
+        timestamp start = util::now();
         transitions.emplace_front(
             std::make_shared<util::ease_transition<double>>(current.x, final.x, current.x, start, duration));
         transitions.emplace_front(
             std::make_shared<util::ease_transition<double>>(current.y, final.y, current.y, start, duration));
     }
 
-    platform::notify_map_change();
+    view.notify_map_change(duration ?
+                           MapChangeRegionDidChangeAnimated :
+                           MapChangeRegionDidChange,
+                           duration);
 }
 
-void Transform::setLonLat(const double lon, const double lat, const time duration) {
+void Transform::setLonLat(const double lon, const double lat, const timestamp duration) {
     uv::writelock lock(mtx);
 
     const double f = std::fmin(std::fmax(std::sin(D2R * lat), -0.9999), 0.9999);
@@ -90,7 +105,7 @@ void Transform::setLonLat(const double lon, const double lat, const time duratio
 }
 
 void Transform::setLonLatZoom(const double lon, const double lat, const double zoom,
-                              const time duration) {
+                              const timestamp duration) {
     uv::writelock lock(mtx);
 
     double new_scale = std::pow(2.0, zoom);
@@ -128,7 +143,7 @@ void Transform::startPanning() {
 
     // Add a 200ms timeout for resetting this to false
     current.panning = true;
-    time start = util::now();
+    timestamp start = util::now();
     pan_timeout = std::make_shared<util::timeout<bool>>(false, current.panning, start, 200_milliseconds);
     transitions.emplace_front(pan_timeout);
 }
@@ -149,7 +164,7 @@ void Transform::_clearPanning() {
 
 #pragma mark - Zoom
 
-void Transform::scaleBy(const double ds, const double cx, const double cy, const time duration) {
+void Transform::scaleBy(const double ds, const double cx, const double cy, const timestamp duration) {
     uv::writelock lock(mtx);
 
     // clamp scale to min/max values
@@ -164,13 +179,13 @@ void Transform::scaleBy(const double ds, const double cx, const double cy, const
 }
 
 void Transform::setScale(const double scale, const double cx, const double cy,
-                         const time duration) {
+                         const timestamp duration) {
     uv::writelock lock(mtx);
 
     _setScale(scale, cx, cy, duration);
 }
 
-void Transform::setZoom(const double zoom, const time duration) {
+void Transform::setZoom(const double zoom, const timestamp duration) {
     uv::writelock lock(mtx);
 
     _setScale(std::pow(2.0, zoom), -1, -1, duration);
@@ -195,7 +210,7 @@ void Transform::startScaling() {
 
     // Add a 200ms timeout for resetting this to false
     current.scaling = true;
-    time start = util::now();
+    timestamp start = util::now();
     scale_timeout = std::make_shared<util::timeout<bool>>(false, current.scaling, start, 200_milliseconds);
     transitions.emplace_front(scale_timeout);
 }
@@ -228,7 +243,7 @@ void Transform::_clearScaling() {
     }
 }
 
-void Transform::_setScale(double new_scale, double cx, double cy, const time duration) {
+void Transform::_setScale(double new_scale, double cx, double cy, const timestamp duration) {
     // This is only called internally, so we don't need a lock here.
 
     // Ensure that we don't zoom in further than the maximum allowed.
@@ -262,8 +277,12 @@ void Transform::_setScale(double new_scale, double cx, double cy, const time dur
 }
 
 void Transform::_setScaleXY(const double new_scale, const double xn, const double yn,
-                            const time duration) {
+                            const timestamp duration) {
     // This is only called internally, so we don't need a lock here.
+
+    view.notify_map_change(duration ?
+                           MapChangeRegionWillChangeAnimated :
+                           MapChangeRegionWillChange);
 
     final.scale = new_scale;
     final.x = xn;
@@ -280,7 +299,7 @@ void Transform::_setScaleXY(const double new_scale, const double xn, const doubl
         current.y = final.y;
     } else {
         // Use a common start time for all of the transitions to avoid divergent transitions.
-        time start = util::now();
+        timestamp start = util::now();
         transitions.emplace_front(std::make_shared<util::ease_transition<double>>(
             current.scale, final.scale, current.scale, start, duration));
         transitions.emplace_front(
@@ -294,7 +313,10 @@ void Transform::_setScaleXY(const double new_scale, const double xn, const doubl
     Bc = s / 360;
     Cc = s / (2 * M_PI);
 
-    platform::notify_map_change();
+    view.notify_map_change(duration ?
+                           MapChangeRegionDidChangeAnimated :
+                           MapChangeRegionDidChange,
+                           duration);
 }
 
 #pragma mark - Constraints
@@ -313,7 +335,7 @@ void Transform::constrain(double& scale, double& y) const {
 #pragma mark - Angle
 
 void Transform::rotateBy(const double start_x, const double start_y, const double end_x,
-                         const double end_y, const time duration) {
+                         const double end_y, const timestamp duration) {
     uv::writelock lock(mtx);
 
     double center_x = current.width / 2, center_y = current.height / 2;
@@ -343,7 +365,7 @@ void Transform::rotateBy(const double start_x, const double start_y, const doubl
     _setAngle(ang, duration);
 }
 
-void Transform::setAngle(const double new_angle, const time duration) {
+void Transform::setAngle(const double new_angle, const timestamp duration) {
     uv::writelock lock(mtx);
 
     _setAngle(new_angle, duration);
@@ -367,8 +389,12 @@ void Transform::setAngle(const double new_angle, const double cx, const double c
     }
 }
 
-void Transform::_setAngle(double new_angle, const time duration) {
+void Transform::_setAngle(double new_angle, const timestamp duration) {
     // This is only called internally, so we don't need a lock here.
+
+    view.notify_map_change(duration ?
+                           MapChangeRegionWillChangeAnimated :
+                           MapChangeRegionWillChange);
 
     while (new_angle > M_PI)
         new_angle -= M2PI;
@@ -383,12 +409,15 @@ void Transform::_setAngle(double new_angle, const time duration) {
     if (duration == 0) {
         current.angle = final.angle;
     } else {
-        time start = util::now();
+        timestamp start = util::now();
         transitions.emplace_front(std::make_shared<util::ease_transition<double>>(
             current.angle, final.angle, current.angle, start, duration));
     }
 
-    platform::notify_map_change();
+    view.notify_map_change(duration ?
+                           MapChangeRegionDidChangeAnimated :
+                           MapChangeRegionDidChange,
+                           duration);
 }
 
 double Transform::getAngle() const {
@@ -404,7 +433,7 @@ void Transform::startRotating() {
 
     // Add a 200ms timeout for resetting this to false
     current.rotating = true;
-    time start = util::now();
+    timestamp start = util::now();
     rotate_timeout = std::make_shared<util::timeout<bool>>(false, current.rotating, start, 200_milliseconds);
     transitions.emplace_front(rotate_timeout);
 }
@@ -437,7 +466,7 @@ bool Transform::needsTransition() const {
     return !transitions.empty();
 }
 
-void Transform::updateTransitions(const time now) {
+void Transform::updateTransitions(const timestamp now) {
     uv::writelock lock(mtx);
 
     transitions.remove_if([now](const std::shared_ptr<util::transition> &transition) {

@@ -1,28 +1,28 @@
-#include <llmr/renderer/text_bucket.hpp>
-#include <llmr/geometry/text_buffer.hpp>
-#include <llmr/geometry/elements_buffer.hpp>
-#include <llmr/geometry/geometry.hpp>
+#include <mbgl/renderer/text_bucket.hpp>
+#include <mbgl/geometry/text_buffer.hpp>
+#include <mbgl/geometry/elements_buffer.hpp>
+#include <mbgl/geometry/geometry.hpp>
 
-#include <llmr/renderer/painter.hpp>
-#include <llmr/style/style.hpp>
-#include <llmr/map/vector_tile.hpp>
-#include <llmr/text/placement.hpp>
-#include <llmr/text/glyph_store.hpp>
-#include <llmr/util/constants.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/map/vector_tile.hpp>
+#include <mbgl/text/placement.hpp>
+#include <mbgl/text/glyph_store.hpp>
+#include <mbgl/util/constants.hpp>
 
-#include <llmr/util/math.hpp>
-#include <llmr/platform/gl.hpp>
+#include <mbgl/util/math.hpp>
+#include <mbgl/platform/gl.hpp>
 
 #include <iostream>
 
 #include <cassert>
 
-using namespace llmr;
+using namespace mbgl;
 
 TextBucket::TextBucket(
     TextVertexBuffer &vertexBuffer,
     TriangleElementsBuffer &triangleElementsBuffer,
-    const BucketTextDescription &properties, Placement &placement)
+    const StyleBucketText &properties, Placement &placement)
     : properties(properties),
       vertexBuffer(vertexBuffer),
       triangleElementsBuffer(triangleElementsBuffer),
@@ -124,9 +124,9 @@ void TextBucket::addFeature(const pbf &geom_pbf,
     }
 }
 
-void TextBucket::render(Painter &painter, const std::string &layer_name,
+void TextBucket::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc,
                         const Tile::ID &id) {
-    painter.renderText(*this, layer_name, id);
+    painter.renderText(*this, layer_desc, id);
 }
 
 bool TextBucket::hasData() const {

@@ -1,25 +1,26 @@
-#include <llmr/renderer/icon_bucket.hpp>
-#include <llmr/geometry/icon_buffer.hpp>
-#include <llmr/geometry/elements_buffer.hpp>
-#include <llmr/geometry/geometry.hpp>
+#include <mbgl/renderer/icon_bucket.hpp>
+#include <mbgl/geometry/icon_buffer.hpp>
+#include <mbgl/geometry/elements_buffer.hpp>
+#include <mbgl/geometry/geometry.hpp>
+#include <mbgl/geometry/sprite_atlas.hpp>
 
-#include <llmr/renderer/painter.hpp>
-#include <llmr/style/style.hpp>
-#include <llmr/style/sprite.hpp>
-#include <llmr/map/vector_tile.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/map/sprite.hpp>
+#include <mbgl/map/vector_tile.hpp>
 
-#include <llmr/platform/gl.hpp>
-#include <llmr/util/constants.hpp>
-#include <llmr/util/token.hpp>
+#include <mbgl/platform/gl.hpp>
+#include <mbgl/util/constants.hpp>
+#include <mbgl/util/token.hpp>
 
 #include <cassert>
 
 struct geometry_too_long_exception : std::exception {};
 
-using namespace llmr;
+using namespace mbgl;
 
 IconBucket::IconBucket(IconVertexBuffer& vertexBuffer,
-                         const BucketIconDescription& properties)
+                         const StyleBucketIcon& properties)
     : properties(properties),
       vertexBuffer(vertexBuffer),
       vertex_start(vertexBuffer.index()) {
@@ -57,8 +58,8 @@ void IconBucket::addFeature(const VectorTileFeature &feature, SpriteAtlas &sprit
     vertex_end = vertexBuffer.index();
 }
 
-void IconBucket::render(Painter& painter, const std::string& layer_name, const Tile::ID& id) {
-    painter.renderIcon(*this, layer_name, id);
+void IconBucket::render(Painter& painter, std::shared_ptr<StyleLayer> layer_desc, const Tile::ID& id) {
+    painter.renderIcon(*this, layer_desc, id);
 }
 
 bool IconBucket::hasData() const {

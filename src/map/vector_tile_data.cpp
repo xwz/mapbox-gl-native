@@ -1,15 +1,22 @@
-#include <llmr/map/vector_tile_data.hpp>
-#include <llmr/util/std.hpp>
-#include <llmr/map/map.hpp>
+#include <mbgl/map/vector_tile_data.hpp>
+#include <mbgl/map/tile_parser.hpp>
+#include <mbgl/util/std.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/style/style_layer.hpp>
+#include <mbgl/style/style_bucket.hpp>
+#include <mbgl/geometry/glyph_atlas.hpp>
 
-using namespace llmr;
+using namespace mbgl;
 
-VectorTileData::VectorTileData(Tile::ID id, Map &map, const std::string url)
-    : TileData(id, map, url) {
+VectorTileData::VectorTileData(Tile::ID id, Map &map, const SourceInfo &source)
+    : TileData(id, map, source) {
 }
 
 VectorTileData::~VectorTileData() {
-    map.getGlyphAtlas()->removeGlyphs(id.to_uint64());
+    std::shared_ptr<GlyphAtlas> glyphAtlas = map.getGlyphAtlas();
+    if (glyphAtlas) {
+        glyphAtlas->removeGlyphs(id.to_uint64());
+    }
 }
 
 void VectorTileData::beforeParse() {
@@ -43,22 +50,23 @@ void VectorTileData::afterParse() {
     parser.reset();
 }
 
-void VectorTileData::render(Painter &painter, const LayerDescription& layer_desc) {
-    auto databucket_it = buckets.find(layer_desc.bucket_name);
-    if (databucket_it != buckets.end()) {
-        assert(databucket_it->second);
-        databucket_it->second->render(painter, layer_desc.name, id);
+void VectorTileData::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc) {
+    if (state == State::parsed && layer_desc->bucket) {
+        auto databucket_it = buckets.find(layer_desc->bucket->name);
+        if (databucket_it != buckets.end()) {
+            assert(databucket_it->second);
+            databucket_it->second->render(painter, layer_desc, id);
+        }
     }
 }
 
-bool VectorTileData::hasData(const LayerDescription& layer_desc) const {
-    if (state != State::parsed) return false;
-
-    auto databucket_it = buckets.find(layer_desc.bucket_name);
-    if (databucket_it != buckets.end()) {
-        assert(databucket_it->second);
-        return databucket_it->second->hasData();
-    } else {
-        return false;
+bool VectorTileData::hasData(std::shared_ptr<StyleLayer> layer_desc) const {
+    if (state == State::parsed && layer_desc->bucket) {
+        auto databucket_it = buckets.find(layer_desc->bucket->name);
+        if (databucket_it != buckets.end()) {
+            assert(databucket_it->second);
+            return databucket_it->second->hasData();
+        }
     }
+    return false;
 }

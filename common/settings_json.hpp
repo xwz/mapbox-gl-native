@@ -1,7 +1,7 @@
-#ifndef LLMR_JSON_SETTINGS
-#define LLMR_JSON_SETTINGS
+#ifndef MBGL_JSON_SETTINGS
+#define MBGL_JSON_SETTINGS
 
-namespace llmr {
+namespace mbgl {
 
 class Settings_JSON {
 public:
@@ -14,7 +14,7 @@ public:
     double longitude = 0;
     double latitude = 0;
     double zoom = 0;
-    double angle = 0;
+    double bearing = 0;
 
     bool debug = false;
 };

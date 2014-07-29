@@ -1,18 +1,18 @@
-#include <llmr/util/raster.hpp>
+#include <mbgl/util/raster.hpp>
 
 #include <memory>
 #include <cassert>
 #include <cstring>
 
-#include <llmr/platform/platform.hpp>
-#include <llmr/platform/gl.hpp>
-#include <llmr/util/time.hpp>
-#include <llmr/util/uv.hpp>
-#include <llmr/util/std.hpp>
+#include <mbgl/platform/platform.hpp>
+#include <mbgl/platform/gl.hpp>
+#include <mbgl/util/time.hpp>
+#include <mbgl/util/uv.hpp>
+#include <mbgl/util/std.hpp>
 
 #include <png.h>
 
-using namespace llmr;
+using namespace mbgl;
 
 Raster::Raster() {
 }
@@ -38,7 +38,7 @@ bool Raster::load(const std::string &data) {
 }
 
 void Raster::beginFadeInTransition() {
-    time start = util::now();
+    timestamp start = util::now();
     fade_transition = std::make_shared<util::ease_transition<double>>(opacity, 1.0, opacity, start, 250_milliseconds);
 }
 
@@ -46,7 +46,7 @@ bool Raster::needsTransition() const {
     return fade_transition != nullptr;
 }
 
-void Raster::updateTransitions(time now) {
+void Raster::updateTransitions(timestamp now) {
     if (fade_transition->update(now) == util::transition::complete) {
         fade_transition = nullptr;
     }

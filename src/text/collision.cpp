@@ -1,17 +1,20 @@
-#include <llmr/text/collision.hpp>
-#include <llmr/text/rotation_range.hpp>
-#include <llmr/util/math.hpp>
+#include <mbgl/text/collision.hpp>
+#include <mbgl/text/rotation_range.hpp>
+#include <mbgl/util/math.hpp>
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wdeprecated-register"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#ifndef __clang__
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#pragma clang diagnostic pop
+#pragma GCC diagnostic pop
 
-namespace llmr {
+namespace mbgl {
 namespace bg = boost::geometry;
 namespace bgm = bg::model;
 namespace bgi = bg::index;
@@ -21,7 +24,7 @@ typedef std::pair<Box, PlacementBox> PlacementValue;
 typedef bgi::rtree<PlacementValue, bgi::rstar<16>> Tree;
 }
 
-using namespace llmr;
+using namespace mbgl;
 
 Collision::~Collision() {
     delete ((Tree *)cTree);

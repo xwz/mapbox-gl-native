@@ -1,20 +1,20 @@
-#include <llmr/renderer/fill_bucket.hpp>
-#include <llmr/geometry/fill_buffer.hpp>
-#include <llmr/geometry/elements_buffer.hpp>
-#include <llmr/geometry/geometry.hpp>
+#include <mbgl/renderer/fill_bucket.hpp>
+#include <mbgl/geometry/fill_buffer.hpp>
+#include <mbgl/geometry/elements_buffer.hpp>
+#include <mbgl/geometry/geometry.hpp>
 
-#include <llmr/renderer/painter.hpp>
-#include <llmr/style/style.hpp>
-#include <llmr/map/vector_tile.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/map/vector_tile.hpp>
 
-#include <llmr/platform/gl.hpp>
+#include <mbgl/platform/gl.hpp>
 
 
 #include <cassert>
 
 struct geometry_too_long_exception : std::exception {};
 
-using namespace llmr;
+using namespace mbgl;
 
 
 
@@ -33,7 +33,7 @@ void FillBucket::free(void *, void *ptr) {
 FillBucket::FillBucket(FillVertexBuffer &vertexBuffer,
                        TriangleElementsBuffer &triangleElementsBuffer,
                        LineElementsBuffer &lineElementsBuffer,
-                       const BucketFillDescription &properties)
+                       const StyleBucketFill &properties)
     : properties(properties),
       allocator(new TESSalloc{&alloc, &realloc, &free, nullptr, // userData
                               64,                               // meshEdgeBucketSize
@@ -204,8 +204,8 @@ void FillBucket::tessellate() {
     lineGroup.vertex_length += total_vertex_count;
 }
 
-void FillBucket::render(Painter& painter, const std::string& layer_name, const Tile::ID& id) {
-    painter.renderFill(*this, layer_name, id);
+void FillBucket::render(Painter& painter, std::shared_ptr<StyleLayer> layer_desc, const Tile::ID& id) {
+    painter.renderFill(*this, layer_desc, id);
 }
 
 bool FillBucket::hasData() const {

@@ -1,6 +1,9 @@
 .DS_Store
 *.xcodeproj
 *.o
+*.actual.png
+*.diff.png
+/node_modules
 /mapnik-packaging
 /macosx/build
 /ios/build
@@ -9,7 +12,8 @@
 /config/constants_local.cpp
 /build
 /bin/node_modules
-/include/llmr/shader/shaders.hpp
+/include/mbgl/shader/shaders.hpp
 /src/shader/shaders_gl.cpp
 /src/shader/shaders_gles2.cpp
 /bin/style.bin.js
+/test/fixtures/styles/index.html

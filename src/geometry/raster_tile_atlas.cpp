@@ -1,11 +1,11 @@
-#include <llmr/geometry/raster_tile_atlas.hpp>
-#include <llmr/platform/gl.hpp>
-#include <llmr/platform/platform.hpp>
-#include <llmr/util/image.hpp>
+#include <mbgl/geometry/raster_tile_atlas.hpp>
+#include <mbgl/platform/gl.hpp>
+#include <mbgl/platform/platform.hpp>
+#include <mbgl/util/image.hpp>
 
 #include <cassert>
 
-using namespace llmr;
+using namespace mbgl;
 
 RasterTileAtlas::RasterTileAtlas(uint16_t width, uint16_t height)
     : width(width),
@@ -61,7 +61,7 @@ Rect<uint16_t> RasterTileAtlas::addTile(const std::string& source_url, const uin
     source_tiles.emplace(tile_id, RasterTileValue { rect });
 
 #if defined(DEBUG)
-    platform::show_debug_image("Raster Tile Atlas", data, width, height);
+//    platform::show_debug_image("Raster Tile Atlas", data, width, height);
 #endif
 
     // Copy the bitmap
@@ -76,7 +76,7 @@ Rect<uint16_t> RasterTileAtlas::addTile(const std::string& source_url, const uin
     }
 
 #if defined(DEBUG)
-    platform::show_debug_image("Raster Tile Atlas", data, width, height);
+//    platform::show_debug_image("Raster Tile Atlas", data, width, height);
 #endif
 
     dirty = true;
@@ -134,7 +134,7 @@ void RasterTileAtlas::bind(Rect<uint16_t> rect) {
         glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x, rect.y, rect.w, rect.h, GL_ALPHA, GL_UNSIGNED_BYTE, data);
 
 #if defined(DEBUG)
-        platform::show_debug_image("Raster Tile Atlas", data, width, height);
+//        platform::show_debug_image("Raster Tile Atlas", data, width, height);
 #endif
 
     }

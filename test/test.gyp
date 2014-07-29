@@ -15,8 +15,18 @@
                             '-framework OpenGL',
                         ],
                     },
+                    'xcode_settings': {
+                        'OTHER_LDFLAGS': [
+                            '-framework OpenGL',
+                        ],
+                    },
                 }, {
-                    # TODO: add OpenGL link settings for linux
+                    'link_settings': {
+                        'libraries': [
+                          '<@(glfw3_libraries)', # This is a hack since we're not actually using GLFW
+                          '-lboost_regex',
+                        ],
+                    },
                 }],
             ],
         },
@@ -61,7 +71,7 @@
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86"
+            "../mapboxgl.gyp:mapboxgl"
         ]
     },
     {
@@ -77,7 +87,23 @@
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86"
+            "../mapboxgl.gyp:mapboxgl"
+        ]
+    },
+    {
+        "target_name": "enums",
+        "product_name": "test_enums",
+        "type": "executable",
+        "libraries": [
+            "-lpthread",
+        ],
+        "sources": [
+            "./main.cpp",
+            "./enums.cpp",
+        ],
+        "dependencies": [
+            "../deps/gtest/gtest.gyp:gtest",
+            "../mapboxgl.gyp:mapboxgl"
         ]
     },
     {
@@ -93,7 +119,23 @@
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86"
+            "../mapboxgl.gyp:mapboxgl"
+        ]
+    },
+    {
+        "target_name": "comparisons",
+        "product_name": "test_comparisons",
+        "type": "executable",
+        "libraries": [
+            "-lpthread",
+        ],
+        "sources": [
+            "./main.cpp",
+            "./comparisons.cpp",
+        ],
+        "dependencies": [
+            "../deps/gtest/gtest.gyp:gtest",
+            "../mapboxgl.gyp:mapboxgl"
         ]
     },
     {
@@ -109,7 +151,7 @@
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86"
+            "../mapboxgl.gyp:mapboxgl"
         ]
     },
     {
@@ -125,7 +167,7 @@
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86"
+            "../mapboxgl.gyp:mapboxgl"
         ]
     },
     {
@@ -138,14 +180,17 @@
         "sources": [
             "./main.cpp",
             "./headless.cpp",
-            "../common/curl_request.hpp",
-            "../common/curl_request.cpp",
+            "../common/headless_view.hpp",
+            "../common/headless_view.cpp",
+            "./fixtures/fixture_request.cpp",
+            "./fixtures/fixture_log.hpp",
+            "./fixtures/fixture_log.cpp",
         ],
         "dependencies": [
             "../deps/gtest/gtest.gyp:gtest",
-            "../llmr.gyp:llmr-x86",
+            "../mapboxgl.gyp:mapboxgl",
             "link_gl",
-            "link_curl",
+            '../mapboxgl.gyp:copy_default_stylesheet',
         ]
     },
     {
@@ -154,9 +199,12 @@
         "dependencies": [
           "rotation_range",
           "clip_ids",
+          "enums",
           "variant",
           "tile",
           "functions",
+          "headless",
+          "comparisons",
         ],
     }
   ]

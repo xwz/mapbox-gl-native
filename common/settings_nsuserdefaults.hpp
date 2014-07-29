@@ -1,7 +1,7 @@
-#ifndef LLMR_COMMON_SETTINGS_NSUSERDEFAULTS
-#define LLMR_COMMON_SETTINGS_NSUSERDEFAULTS
+#ifndef MBGL_COMMON_SETTINGS_NSUSERDEFAULTS
+#define MBGL_COMMON_SETTINGS_NSUSERDEFAULTS
 
-namespace llmr {
+namespace mbgl {
 
 class Settings_NSUserDefaults {
 public:
@@ -14,7 +14,7 @@ public:
     double longitude = 0;
     double latitude = 0;
     double zoom = 0;
-    double angle = 0;
+    double bearing = 0;
 
     bool debug = false;
 };

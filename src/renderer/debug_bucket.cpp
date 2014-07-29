@@ -1,20 +1,20 @@
-#include <llmr/renderer/debug_bucket.hpp>
+#include <mbgl/renderer/debug_bucket.hpp>
 
-#include <llmr/renderer/painter.hpp>
+#include <mbgl/renderer/painter.hpp>
 
-#include <llmr/platform/gl.hpp>
+#include <mbgl/platform/gl.hpp>
 
 #include <cassert>
 
 struct geometry_too_long_exception : std::exception {};
 
-using namespace llmr;
+using namespace mbgl;
 
 DebugBucket::DebugBucket(DebugFontBuffer& fontBuffer)
     : fontBuffer(fontBuffer) {
 }
 
-void DebugBucket::render(Painter& painter, const std::string& /*layer_name*/, const Tile::ID& /*id*/) {
+void DebugBucket::render(Painter& painter, std::shared_ptr<StyleLayer> layer_desc, const Tile::ID& /*id*/) {
     painter.renderDebugText(*this);
 }
 

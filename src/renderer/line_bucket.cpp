@@ -1,13 +1,13 @@
-#include <llmr/renderer/line_bucket.hpp>
-#include <llmr/geometry/elements_buffer.hpp>
-#include <llmr/geometry/geometry.hpp>
+#include <mbgl/renderer/line_bucket.hpp>
+#include <mbgl/geometry/elements_buffer.hpp>
+#include <mbgl/geometry/geometry.hpp>
 
-#include <llmr/renderer/painter.hpp>
-#include <llmr/style/style.hpp>
-#include <llmr/map/vector_tile.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/map/vector_tile.hpp>
 
-#include <llmr/util/math.hpp>
-#include <llmr/platform/gl.hpp>
+#include <mbgl/util/math.hpp>
+#include <mbgl/platform/gl.hpp>
 
 #define BUFFER_OFFSET(i) ((char *)nullptr + (i))
 
@@ -15,12 +15,12 @@
 
 struct geometry_too_long_exception : std::exception {};
 
-using namespace llmr;
+using namespace mbgl;
 
 LineBucket::LineBucket(LineVertexBuffer& vertexBuffer,
                        TriangleElementsBuffer& triangleElementsBuffer,
                        PointElementsBuffer& pointElementsBuffer,
-                       const BucketLineDescription& properties)
+                       const StyleBucketLine& properties)
     : properties(properties),
       vertexBuffer(vertexBuffer),
       triangleElementsBuffer(triangleElementsBuffer),
@@ -80,7 +80,7 @@ void LineBucket::addGeometry(const std::vector<Coordinate>& vertices) {
     CapType beginCap = properties.cap;
     CapType endCap = closed ? CapType::Butt : properties.cap;
 
-    JoinType currentJoin = JoinType::None;
+    JoinType currentJoin = JoinType::Default;
 
     Coordinate currentVertex = Coordinate::null(),
                prevVertex = Coordinate::null(),
@@ -341,8 +341,8 @@ void LineBucket::addGeometry(const std::vector<Coordinate>& vertices) {
     }
 }
 
-void LineBucket::render(Painter& painter, const std::string& layer_name, const Tile::ID& id) {
-    painter.renderLine(*this, layer_name, id);
+void LineBucket::render(Painter& painter, std::shared_ptr<StyleLayer> layer_desc, const Tile::ID& id) {
+    painter.renderLine(*this, layer_desc, id);
 }
 
 bool LineBucket::hasData() const {

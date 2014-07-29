@@ -1,156 +1,132 @@
 #include "gtest/gtest.h"
 
-#include <llmr/llmr.hpp>
-#include <llmr/util/image.hpp>
-#include <llmr/util/io.hpp>
-#include <llmr/util/timer.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/util/image.hpp>
+#include <mbgl/util/io.hpp>
+#include <mbgl/util/std.hpp>
 
-#include <uv.h>
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "../common/headless_view.hpp"
 
+#include "./fixtures/fixture_log.hpp"
 
-namespace llmr {
-namespace platform {
+#include <dirent.h>
 
-void notify_map_change() {
-    // no-op
+const std::string base_directory = []{
+    std::string fn = __FILE__;
+    fn.erase(fn.find_last_of("/"));
+    return fn + "/../node_modules/mapbox-gl-test-suite/";
+}();
+
+class HeadlessTest : public ::testing::TestWithParam<std::string> {};
+
+void ResolveLocalURL(rapidjson::Value& value, rapidjson::Document& doc) {
+    std::string str { value.GetString(), value.GetStringLength() };
+    str.replace(0, 8, base_directory); // local://
+    value.SetString(str.c_str(), str.length(), doc.GetAllocator());
 }
 
-}}
+TEST_P(HeadlessTest, render) {
+    using namespace mbgl;
 
-class View : public llmr::View {
-public:
-    void make_active() {
-        CGLError error = CGLSetCurrentContext(gl_context);
-        if (error) {
-            fprintf(stderr, "Switching OpenGL context failed\n");
-        }
+    const std::string &base = GetParam();
+
+    std::string style = util::read_file(base_directory + "tests/" + base + "/style.json");
+    std::string info = util::read_file(base_directory + "tests/" + base + "/info.json");
+
+    // Parse style.
+    rapidjson::Document styleDoc;
+    styleDoc.Parse<0>((const char *const)style.c_str());
+    ASSERT_EQ(false, styleDoc.HasParseError());
+    ASSERT_EQ(true, styleDoc.IsObject());
+
+    if (styleDoc.HasMember("sprite")) {
+        ResolveLocalURL(styleDoc["sprite"], styleDoc);
     }
-    void swap() {}
 
-CGLContextObj gl_context;
-};
+    ResolveLocalURL(styleDoc["sources"]["mapbox"]["url"], styleDoc);
 
-TEST(Headless, initialize) {
-    llmr::util::timer timer;
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    styleDoc.Accept(writer);
+    style = buffer.GetString();
+
+    // Parse settings.
+    rapidjson::Document infoDoc;
+    infoDoc.Parse<0>((const char *const)info.c_str());
+    ASSERT_EQ(false, infoDoc.HasParseError());
+    ASSERT_EQ(true, infoDoc.IsObject());
+
+    Log::Set<FixtureLogBackend>();
 
     // Setup OpenGL
-    View view;
+    HeadlessView view;
+    Map map(view);
 
-    // TODO: test if OpenGL 4.1 with GL_ARB_ES2_compatibility is supported
-    // If it is, use kCGLOGLPVersion_3_2_Core and enable that extension.
-    CGLPixelFormatAttribute attributes[] = {
-        kCGLPFAOpenGLProfile,
-        (CGLPixelFormatAttribute) kCGLOGLPVersion_Legacy,
-        kCGLPFAAccelerated,
-        (CGLPixelFormatAttribute) 0
-    };
+    for (auto it = infoDoc.MemberBegin(), end = infoDoc.MemberEnd(); it != end; it++) {
+        const std::string name { it->name.GetString(), it->name.GetStringLength() };
+        const rapidjson::Value &value = it->value;
+        ASSERT_EQ(true, value.IsObject());
+        if (value.HasMember("center")) ASSERT_EQ(true, value["center"].IsArray());
 
-    CGLPixelFormatObj pixelFormat;
-    GLint num;
-    CGLError error = CGLChoosePixelFormat(attributes, &pixelFormat, &num);
-    if (error) {
-        fprintf(stderr, "Error pixel format\n");
-        return;
-    }
+        const std::string actual_image = base_directory + "tests/" + base + "/" + name +  "/actual.png";
 
-    error = CGLCreateContext(pixelFormat, NULL, &view.gl_context);
-    CGLDestroyPixelFormat(pixelFormat);
-    if (error) {
-        fprintf(stderr, "Error creating GL context object\n");
-        return;
-    }
-
-    view.make_active();
-
-    timer.report("gl setup");
-
-
-    int width = 1024;
-    int height = 768;
-
-    // Create depth/stencil buffer
-    GLuint fbo_depth_stencil = 0;
-    glGenRenderbuffersEXT(1, &fbo_depth_stencil);
-    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, fbo_depth_stencil);
-    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH24_STENCIL8_EXT, width, height);
-    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-
-    GLuint fbo_color = 0;
-    glGenRenderbuffersEXT(1, &fbo_color);
-    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, fbo_color);
-    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA8, width, height);
-    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-
-    GLuint fbo = 0;
-    glGenFramebuffersEXT(1, &fbo);
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, fbo_color);
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER_EXT, fbo_depth_stencil);
-
-    GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-
-
-    if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
-        fprintf(stderr, "Couldn't create framebuffer: ");
-        switch (status) {
-            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT: fprintf(stderr, "incomplete attachment\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT_EXT: fprintf(stderr, "incomplete missing attachment\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER_EXT: fprintf(stderr, "incomplete draw buffer\n"); break;
-            case GL_FRAMEBUFFER_UNSUPPORTED: fprintf(stderr, "unsupported\n"); break;
-            default: fprintf(stderr, "other\n"); break;
+        const double zoom = value.HasMember("zoom") ? value["zoom"].GetDouble() : 0;
+        const double bearing = value.HasMember("bearing") ? value["bearing"].GetDouble() : 0;
+        const double latitude = value.HasMember("center") ? value["center"][rapidjson::SizeType(0)].GetDouble() : 0;
+        const double longitude = value.HasMember("center") ? value["center"][rapidjson::SizeType(1)].GetDouble() : 0;
+        const unsigned int width = value.HasMember("width") ? value["width"].GetUint() : 512;
+        const unsigned int height = value.HasMember("height") ? value["height"].GetUint() : 512;
+        std::vector<std::string> classes;
+        if (value.HasMember("classes")) {
+            const rapidjson::Value &js_classes = value["classes"];
+            ASSERT_EQ(true, js_classes.IsArray());
+            for (rapidjson::SizeType i = 0; i < js_classes.Size(); i++) {
+                const rapidjson::Value &js_class = js_classes[i];
+                ASSERT_EQ(true, js_class.IsString());
+                classes.push_back({ js_class.GetString(), js_class.GetStringLength() });
+            }
         }
-        return;
+
+        map.setStyleJSON(style);
+        map.setAppliedClasses(classes);
+
+        view.resize(width, height);
+        map.resize(width, height);
+        map.setLonLatZoom(longitude, latitude, zoom);
+        map.setBearing(bearing);
+
+        // Run the loop. It will terminate when we don't have any further listeners.
+        map.run();
+
+        const std::unique_ptr<uint32_t[]> pixels(new uint32_t[width * height]);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.get());
+
+        const std::string image = util::compress_png(width, height, pixels.get(), true);
+        util::write_file(actual_image, image);
     }
 
-    timer.report("gl framebuffer");
-
-
-    llmr::Map map(view);
-
-    map.resize(width, height);
-
-    std::ifstream stylefile("./style.min.js");
-    ASSERT_TRUE(stylefile.good());
-    std::stringstream stylejson;
-    stylejson << stylefile.rdbuf();
-
-    map.setStyleJSON(stylejson.str());
-
-    timer.report("map resize");
-
-    // Run the loop. It will terminate when we don't have any further listeners.
-    map.run();
-
-    timer.report("map loop");
-
-    uint32_t *pixels = new uint32_t[width * height];
-
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-
-    timer.report("gl readpixels");
-
-    std::string result = llmr::util::compress_png(width, height, pixels, true);
-
-    timer.report("compress png");
-
-    llmr::util::write_file("out.png", result);
-
-    timer.report("save file");
-
-
-    delete[] pixels;
-
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-    glDeleteFramebuffersEXT(1, &fbo);
-    glDeleteTextures(1, &fbo_color);
-    glDeleteRenderbuffersEXT(1, &fbo_depth_stencil);
-
-    CGLDestroyContext(view.gl_context);
-
-    timer.report("destruct");
 }
+
+INSTANTIATE_TEST_CASE_P(Headless, HeadlessTest, ::testing::ValuesIn([] {
+    std::vector<std::string> names;
+
+    DIR *dir = opendir((base_directory + "tests").c_str());
+    if (dir == nullptr) {
+        return names;
+    }
+
+    for (dirent *dp = nullptr; (dp = readdir(dir)) != nullptr;) {
+        const std::string name = dp->d_name;
+        if (name != "." && name != ".." && name != "index.html") {
+            names.push_back(name);
+        }
+    }
+
+    closedir(dir);
+
+    return names;
+}()));

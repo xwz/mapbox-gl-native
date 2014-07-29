@@ -1,8 +1,13 @@
-#include <llmr/style/value.hpp>
+#include <mbgl/style/value.hpp>
 
+#pragma GCC diagnostic push
+#ifndef __clang__
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
 #include <boost/lexical_cast.hpp>
+#pragma GCC diagnostic pop
 
-llmr::Value llmr::parseValue(pbf data) {
+mbgl::Value mbgl::parseValue(pbf data) {
     while (data.next())
     {
         switch (data.tag)
@@ -29,7 +34,7 @@ llmr::Value llmr::parseValue(pbf data) {
     return false;
 }
 
-std::string llmr::toString(const llmr::Value& value) {
+std::string mbgl::toString(const mbgl::Value& value) {
     if (value.is<std::string>()) return value.get<std::string>();
     else if (value.is<bool>()) return value.get<bool>() ? "true" : "false";
     else if (value.is<int64_t>()) return std::to_string(value.get<int64_t>());

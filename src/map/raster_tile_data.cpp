@@ -1,13 +1,13 @@
-#include <llmr/map/map.hpp>
-#include <llmr/map/raster_tile_data.hpp>
-#include <llmr/style/layer_description.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/map/raster_tile_data.hpp>
+#include <mbgl/style/style.hpp>
 
-using namespace llmr;
+using namespace mbgl;
 
-RasterTileData::RasterTileData(Tile::ID id, Map &map, const std::string url)
-    : TileData(id, map, url),
-    bucket(),
-    id(id) {
+
+RasterTileData::RasterTileData(Tile::ID id, Map &map, const SourceInfo &source)
+    : TileData(id, map, source),
+    bucket() {
 }
 
 RasterTileData::~RasterTileData() {
@@ -27,12 +27,12 @@ void RasterTileData::parse() {
     }
 }
 
-void RasterTileData::render(Painter &painter, const LayerDescription& layer_desc) {
+void RasterTileData::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc) {
     Rect<uint16_t> rect = map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
     map.getRasterTileAtlas()->bind(rect);
-    bucket.render(painter, layer_desc.name, id);
+    bucket.render(painter, layer_desc, id);
 }
 
-bool RasterTileData::hasData(const LayerDescription& layer_desc) const {
+bool RasterTileData::hasData(std::shared_ptr<StyleLayer> layer_desc) const {
     return bucket.hasData();
 }

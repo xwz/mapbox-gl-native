@@ -1,34 +1,48 @@
-#include <llmr/map/source.hpp>
-#include <llmr/map/map.hpp>
-#include <llmr/map/transform.hpp>
-#include <llmr/renderer/painter.hpp>
-#include <llmr/util/constants.hpp>
-#include <llmr/util/raster.hpp>
-#include <llmr/util/string.hpp>
-#include <llmr/util/vec.hpp>
-#include <llmr/util/std.hpp>
-#include <llmr/geometry/glyph_atlas.hpp>
+#include <mbgl/map/source.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/map/transform.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/util/constants.hpp>
+#include <mbgl/util/raster.hpp>
+#include <mbgl/util/string.hpp>
+#include <mbgl/util/vec.hpp>
+#include <mbgl/util/std.hpp>
+#include <mbgl/geometry/glyph_atlas.hpp>
+#include <mbgl/style/style_layer.hpp>
 
 
-#include <llmr/map/vector_tile_data.hpp>
-#include <llmr/map/raster_tile_data.hpp>
+#include <mbgl/map/vector_tile_data.hpp>
+#include <mbgl/map/raster_tile_data.hpp>
 
-using namespace llmr;
+namespace mbgl {
 
-Source::Source(Map &map, Painter &painter,
-               const char *url, Source::Type type, uint32_t tile_size,
-               uint32_t min_zoom, uint32_t max_zoom, bool enabled)
-    : enabled(enabled),
-      map(map),
-      painter(painter),
-      type(type),
-      url(url),
-      tile_size(tile_size),
-      min_zoom(min_zoom),
-      max_zoom(max_zoom) {}
+Source::Source(SourceInfo info, const std::string &access_token)
+    : info(
+          info.type,
+          normalizeSourceURL(info.url, access_token),
+          info.tile_size,
+          info.min_zoom,
+          info.max_zoom
+      ) {}
 
-bool Source::update() {
-    return updateTiles();
+std::string Source::normalizeSourceURL(const std::string &url, const std::string &access_token) {
+    const std::string t = "mapbox://";
+    if (url.compare(0, t.length(), t) == 0) {
+        if (access_token.empty()) {
+            throw std::runtime_error("You must provide a Mapbox API access token for Mapbox tile sources");
+        }
+        return std::string("https://api.tiles.mapbox.com/v4/") + url.substr(t.length()) + "/{z}/{x}/{y}.vector.pbf?access_token=" + access_token;
+    } else {
+        return url;
+    }
+}
+
+bool Source::update(Map &map) {
+    if (map.getTime() > updated) {
+        return updateTiles(map);
+    } else {
+        return false;
+    }
 }
 
 void Source::updateClipIDs(const std::map<Tile::ID, ClipID> &mapping) {
@@ -43,11 +57,11 @@ void Source::updateClipIDs(const std::map<Tile::ID, ClipID> &mapping) {
     });
 }
 
-void Source::updateMatrices(const TransformState &transform) {
+void Source::updateMatrices(const mat4 &projMatrix, const TransformState &transform) {
     for (std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair : tiles) {
         Tile &tile = *pair.second;
         transform.matrixFor(tile.matrix, tile.id);
-        matrix::multiply(tile.matrix, painter.projMatrix, tile.matrix);
+        matrix::multiply(tile.matrix, projMatrix, tile.matrix);
     }
 }
 
@@ -55,7 +69,7 @@ size_t Source::getTileCount() const {
     return tiles.size();
 }
 
-void Source::drawClippingMasks() {
+void Source::drawClippingMasks(Painter &painter) {
     for (std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair : tiles) {
         Tile &tile = *pair.second;
         gl::group group(util::sprintf<32>("mask %d/%d/%d", tile.id.z, tile.id.y, tile.id.z));
@@ -63,10 +77,8 @@ void Source::drawClippingMasks() {
     }
 }
 
-void Source::render(const LayerDescription& layer_desc, const BucketDescription &bucket_desc) {
-    if (!enabled) return;
-
-    gl::group group(std::string("layer: ") + layer_desc.name);
+void Source::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc) {
+    gl::group group(std::string("layer: ") + layer_desc->id);
     for (const std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair : tiles) {
         Tile &tile = *pair.second;
         if (tile.data && tile.data->state == TileData::State::parsed) {
@@ -75,9 +87,7 @@ void Source::render(const LayerDescription& layer_desc, const BucketDescription 
     }
 }
 
-void Source::finishRender() {
-    if (!enabled) return;
-
+void Source::finishRender(Painter &painter) {
     for (std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair : tiles) {
         Tile &tile = *pair.second;
         painter.renderTileDebug(tile);
@@ -107,7 +117,7 @@ TileData::State Source::hasTile(const Tile::ID& id) {
     return TileData::State::invalid;
 }
 
-TileData::State Source::addTile(const Tile::ID& id) {
+TileData::State Source::addTile(Map &map, const Tile::ID& id) {
     const TileData::State state = hasTile(id);
 
     if (state != TileData::State::invalid) {
@@ -134,15 +144,12 @@ TileData::State Source::addTile(const Tile::ID& id) {
 
     if (!new_tile.data) {
         // If we don't find working tile data, we're just going to load it.
-
-        std::string formed_url;
-
-        if (type == Source::Type::vector) {
-            formed_url = util::sprintf<256>(url, normalized_id.z, normalized_id.x, normalized_id.y);
-            new_tile.data = std::make_shared<VectorTileData>(normalized_id, map, formed_url);
+        if (info.type == SourceType::Vector) {
+            new_tile.data = std::make_shared<VectorTileData>(normalized_id, map, info);
+        } else if (info.type == SourceType::Raster) {
+            new_tile.data = std::make_shared<RasterTileData>(normalized_id, map, info);
         } else {
-            formed_url = util::sprintf<256>(url, normalized_id.z, normalized_id.x, normalized_id.y, (map.getState().getPixelRatio() > 1.0 ? "@2x" : ""));
-            new_tile.data = std::make_shared<RasterTileData>(normalized_id, map, formed_url);
+            throw std::runtime_error("source type not implemented");
         }
 
         new_tile.data->request();
@@ -203,27 +210,27 @@ bool Source::findLoadedParent(const Tile::ID& id, int32_t minCoveringZoom, std::
     return false;
 }
 
-bool Source::updateTiles() {
+bool Source::updateTiles(Map &map) {
     bool changed = false;
 
     // Figure out what tiles we need to load
-    int32_t zoom = map.getState().getIntegerZoom();
-    if (zoom > max_zoom) zoom = max_zoom;
-    if (zoom < min_zoom) zoom = min_zoom;
+    int32_t clamped_zoom = map.getState().getIntegerZoom();
+    if (clamped_zoom > info.max_zoom) clamped_zoom = info.max_zoom;
+    if (clamped_zoom < info.min_zoom) clamped_zoom = info.min_zoom;
 
-    int32_t max_covering_zoom = zoom + 1;
-    if (max_covering_zoom > max_zoom) max_covering_zoom = max_zoom;
+    int32_t max_covering_zoom = clamped_zoom + 1;
+    if (max_covering_zoom > info.max_zoom) max_covering_zoom = info.max_zoom;
 
-    int32_t min_covering_zoom = zoom - 10;
-    if (min_covering_zoom < min_zoom) min_covering_zoom = min_zoom;
+    int32_t min_covering_zoom = clamped_zoom - 10;
+    if (min_covering_zoom < info.min_zoom) min_covering_zoom = info.min_zoom;
 
     // Map four viewport corners to pixel coordinates
-    box box = map.getState().cornersToBox(zoom);
+    box box = map.getState().cornersToBox(clamped_zoom);
 
     // Performs a scanline algorithm search that covers the rectangle of the box
     // and sorts them by proximity to the center.
 
-    std::forward_list<Tile::ID> required = covering_tiles(zoom, box);
+    std::forward_list<Tile::ID> required = covering_tiles(map.getState(), clamped_zoom, box);
 
     // Retain is a list of tiles that we shouldn't delete, even if they are not
     // the most ideal tile for the current viewport. This may include tiles like
@@ -232,7 +239,7 @@ bool Source::updateTiles() {
 
     // Add existing child/parent tiles if the actual tile is not yet loaded
     for (const Tile::ID& id : required) {
-        const TileData::State state = addTile(id);
+        const TileData::State state = addTile(map, id);
 
         if (state != TileData::State::parsed) {
 //            if (use_raster && (transform.rotating || transform.scaling || transform.panning))
@@ -260,7 +267,7 @@ bool Source::updateTiles() {
     // Remove tiles that we definitely don't need, i.e. tiles that are not on
     // the required list.
     std::set<Tile::ID> retain_data;
-    std::erase_if(tiles, [&retain, &retain_data, &changed](std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair) {
+    util::erase_if(tiles, [&retain, &retain_data, &changed](std::pair<const Tile::ID, std::unique_ptr<Tile>> &pair) {
         Tile &tile = *pair.second;
         bool obsolete = std::find(retain.begin(), retain.end(), tile.id) == retain.end();
         if (obsolete) {
@@ -272,7 +279,7 @@ bool Source::updateTiles() {
     });
 
     // Remove all the expired pointers from the set.
-    std::erase_if(tile_data, [&retain_data](std::pair<const Tile::ID, std::weak_ptr<TileData>> &pair) {
+    util::erase_if(tile_data, [&retain_data](std::pair<const Tile::ID, std::weak_ptr<TileData>> &pair) {
         const std::shared_ptr<TileData> tile = pair.second.lock();
         if (!tile) {
             return true;
@@ -286,6 +293,8 @@ bool Source::updateTiles() {
             return false;
         }
     });
+
+    updated = map.getTime();
 
     return changed;
 }
@@ -304,7 +313,7 @@ struct edge {
 typedef const std::function<void(int32_t, int32_t, int32_t, int32_t)> ScanLine;
 
 // scan-line conversion
-edge _edge(const llmr::vec2<double> a, const llmr::vec2<double> b) {
+edge _edge(const mbgl::vec2<double> a, const mbgl::vec2<double> b) {
     if (a.y > b.y) {
         return { b.x, b.y, a.x, a.y, a.x - b.x, a.y - b.y };
     } else {
@@ -337,7 +346,7 @@ void _scanSpans(edge e0, edge e1, int32_t ymin, int32_t ymax, ScanLine scanLine)
 }
 
 // scan-line conversion
-void _scanTriangle(const llmr::vec2<double> a, const llmr::vec2<double> b, const llmr::vec2<double> c, int32_t ymin, int32_t ymax, ScanLine& scanLine) {
+void _scanTriangle(const mbgl::vec2<double> a, const mbgl::vec2<double> b, const mbgl::vec2<double> c, int32_t ymin, int32_t ymax, ScanLine& scanLine) {
     edge ab = _edge(a, b);
     edge bc = _edge(b, c);
     edge ca = _edge(c, a);
@@ -352,30 +361,30 @@ void _scanTriangle(const llmr::vec2<double> a, const llmr::vec2<double> b, const
     if (bc.dy) _scanSpans(ca, bc, ymin, ymax, scanLine);
 }
 
-double Source::getZoom() const {
-    double offset = log(util::tileSize / tile_size) / log(2);
-    offset += (map.getState().getPixelRatio() > 1.0 ? 1 :0);
-    return map.getState().getZoom() + offset;
+double Source::getZoom(const TransformState &state) const {
+    double offset = log(util::tileSize / info.tile_size) / log(2);
+    offset += (state.getPixelRatio() > 1.0 ? 1 :0);
+    return state.getZoom() + offset;
 }
 
-std::forward_list<llmr::Tile::ID> Source::covering_tiles(int32_t zoom, const box& points) {
-    int32_t dim = std::pow(2, zoom);
-    std::forward_list<llmr::Tile::ID> tiles;
-    bool is_raster = (type == Type::raster);
-    double search_zoom = getZoom();
+std::forward_list<mbgl::Tile::ID> Source::covering_tiles(const TransformState &state, int32_t clamped_zoom, const box& points) {
+    int32_t dim = std::pow(2, clamped_zoom);
+    std::forward_list<mbgl::Tile::ID> tiles;
+    bool is_raster = (info.type == SourceType::Raster);
+    double search_zoom = getZoom(state);
 
-    auto scanLine = [&tiles, zoom, is_raster, search_zoom](int32_t x0, int32_t x1, int32_t y, int32_t ymax) {
+    auto scanLine = [&tiles, clamped_zoom, is_raster, search_zoom](int32_t x0, int32_t x1, int32_t y, int32_t ymax) {
         int32_t x;
         if (y >= 0 && y <= ymax) {
             for (x = x0; x < x1; x++) {
                 if (is_raster) {
-                    Tile::ID id = Tile::ID(zoom, x, y);
+                    Tile::ID id = Tile::ID(clamped_zoom, x, y);
                     auto ids = id.children(search_zoom);
                     for (const Tile::ID& child_id : ids) {
                         tiles.emplace_front(child_id.z, child_id.x, child_id.y);
                     }
                 } else {
-                    tiles.emplace_front(zoom, x, y);
+                    tiles.emplace_front(clamped_zoom, x, y);
                 }
             }
         }
@@ -398,4 +407,6 @@ std::forward_list<llmr::Tile::ID> Source::covering_tiles(int32_t zoom, const box
     tiles.unique();
 
     return tiles;
+}
+
 }

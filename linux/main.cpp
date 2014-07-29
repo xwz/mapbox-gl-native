@@ -1,5 +1,5 @@
-#include <llmr/llmr.hpp>
-#include <llmr/platform/platform.hpp>
+#include <mbgl/mbgl.hpp>
+#include <mbgl/platform/platform.hpp>
 
 #include <signal.h>
 #include <getopt.h>
@@ -8,6 +8,7 @@
 
 #include "../common/settings_json.hpp"
 #include "../common/glfw_view.hpp"
+#include "../common/stderr_log.hpp"
 
 GLFWView *view = nullptr;
 
@@ -22,6 +23,8 @@ void quit_handler(int) {
 }
 
 int main(int argc, char *argv[]) {
+    mbgl::Log::Set<mbgl::StderrLogBackend>();
+
     int fullscreen_flag = 0;
 
     const struct option long_options[] = {
@@ -52,13 +55,21 @@ int main(int argc, char *argv[]) {
     stylejson << stylefile.rdbuf();
 
     view = new GLFWView();
-    llmr::Map map(*view);
+    mbgl::Map map(*view);
 
     // Load settings
-    llmr::Settings_JSON settings;
+    mbgl::Settings_JSON settings;
     map.setLonLatZoom(settings.longitude, settings.latitude, settings.zoom);
-    map.setAngle(settings.angle);
+    map.setBearing(settings.bearing);
     map.setDebug(settings.debug);
+
+    // Set access token if present
+    const char *token = getenv("MAPBOX_ACCESS_TOKEN");
+    if (token == nullptr) {
+        mbgl::Log::Warning(mbgl::Event::Setup, "no access token set. mapbox.com tiles won't work.");
+    } else {
+        map.setAccessToken(std::string(token));
+    }
 
     // Load style
     map.setStyleJSON(stylejson.str());
@@ -67,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     // Save settings
     map.getLonLatZoom(settings.longitude, settings.latitude, settings.zoom);
-    settings.angle = map.getAngle();
+    settings.bearing = map.getBearing();
     settings.debug = map.getDebug();
     settings.save();
 

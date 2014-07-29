@@ -1,18 +1,20 @@
-#include <llmr/renderer/painter.hpp>
-#include <llmr/map/map.hpp>
-#include <llmr/util/std.hpp>
-#include <llmr/util/string.hpp>
-#include <llmr/util/time.hpp>
-#include <llmr/util/clip_ids.hpp>
-#include <llmr/util/constants.hpp>
+#include <mbgl/renderer/painter.hpp>
+#include <mbgl/map/map.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/style/style_layer.hpp>
+#include <mbgl/util/std.hpp>
+#include <mbgl/util/string.hpp>
+#include <mbgl/util/time.hpp>
+#include <mbgl/util/clip_ids.hpp>
+#include <mbgl/util/constants.hpp>
 #if defined(DEBUG)
-#include <llmr/util/timer.hpp>
+#include <mbgl/util/timer.hpp>
 #endif
 
 #include <cassert>
 #include <algorithm>
 
-using namespace llmr;
+using namespace mbgl;
 
 #define BUFFER_OFFSET(i) ((char *)nullptr + (i))
 
@@ -135,13 +137,10 @@ void Painter::clear() {
     gl::group group("clear");
     glStencilMask(0xFF);
     depthMask(true);
-#ifdef NVIDIA
-    // We're painting in a way that allows us to skip clearing the color buffer.
-    // On Tegra hardware, this is faster.
-    glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#else
+
+    const BackgroundProperties &properties = map.getStyle()->getBackgroundProperties();
+    glClearColor(properties.color[0], properties.color[1], properties.color[2], properties.color[3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#endif
 }
 
 void Painter::setOpaque() {
@@ -172,10 +171,10 @@ void Painter::prepareTile(const Tile& tile) {
     glStencilFunc(GL_EQUAL, id, mask);
 }
 
-void Painter::renderTileLayer(const Tile& tile, const LayerDescription &layer_desc) {
+void Painter::renderTileLayer(const Tile& tile, std::shared_ptr<StyleLayer> layer_desc) {
     assert(tile.data);
     if (tile.data->hasData(layer_desc)) {
-        gl::group group(util::sprintf<32>("render %d/%d/%d", tile.id.z, tile.id.y, tile.id.z));
+        gl::group group(util::sprintf<32>("render %d/%d/%d\n", tile.id.z, tile.id.y, tile.id.z));
         prepareTile(tile);
         tile.data->render(*this, layer_desc);
         frameHistory.record(map.getAnimationTime(), map.getState().getNormalizedZoom());
@@ -183,14 +182,14 @@ void Painter::renderTileLayer(const Tile& tile, const LayerDescription &layer_de
 }
 
 
-const mat4 &Painter::translatedMatrix(const std::array<float, 2> &translation, const Tile::ID &id, TranslateAnchor anchor) {
+const mat4 &Painter::translatedMatrix(const std::array<float, 2> &translation, const Tile::ID &id, TranslateAnchorType anchor) {
     if (translation[0] == 0 && translation[1] == 0) {
         return matrix;
     } else {
         // TODO: Get rid of the 8 (scaling from 4096 to tile size)
         const double factor = ((double)(1 << id.z)) / map.getState().getScale() * (4096.0 / util::tileSize);
 
-        if (anchor == TranslateAnchor::Viewport) {
+        if (anchor == TranslateAnchorType::Viewport) {
             const double sin_a = std::sin(-map.getState().getAngle());
             const double cos_a = std::cos(-map.getState().getAngle());
             matrix::translate(vtxMatrix, matrix,
@@ -206,22 +205,4 @@ const mat4 &Painter::translatedMatrix(const std::array<float, 2> &translation, c
 
         return vtxMatrix;
     }
-}
-
-void Painter::renderMatte() {
-    gl::group group("matte");
-    glDisable(GL_DEPTH_TEST);
-    glStencilFunc(GL_EQUAL, 0x0, 0xFF);
-
-    Color matte = {{ 0, 0, 0, 1 }};
-
-    useProgram(plainShader->program);
-    plainShader->setMatrix(nativeMatrix);
-
-    // Draw the clipping mask
-    matteArray.bind(*plainShader, tileStencilBuffer, BUFFER_OFFSET(0));
-    plainShader->setColor(matte);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)tileStencilBuffer.index());
-
-    glEnable(GL_DEPTH_TEST);
 }

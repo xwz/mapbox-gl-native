@@ -1,11 +1,11 @@
-#include <llmr/util/image.hpp>
+#include <mbgl/util/image.hpp>
 #include <png.h>
 
 #include <cassert>
 #include <cstdlib>
 
 
-std::string llmr::util::compress_png(int width, int height, void *rgba, bool flip) {
+std::string mbgl::util::compress_png(int width, int height, void *rgba, bool flip) {
     png_voidp error_ptr = 0;
     png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, error_ptr, NULL, NULL);
     if (!png_ptr) {
@@ -53,7 +53,7 @@ std::string llmr::util::compress_png(int width, int height, void *rgba, bool fli
 }
 
 
-using namespace llmr::util;
+using namespace mbgl::util;
 
 
 struct Buffer {
@@ -84,7 +84,7 @@ void warningHandler(png_structp, png_const_charp error_msg) {
     fprintf(stderr, "PNG: %s\n", error_msg);
 }
 
-Image::Image(const std::string &data) {
+Image::Image(const std::string &data, bool flip) {
     Buffer buffer(data);
 
     if (buffer.length < 8 || !png_check_sig((const png_bytep)buffer.data, 8)) {
@@ -148,7 +148,7 @@ Image::Image(const std::string &data) {
             png_bytep *rows = nullptr;
         } pointers(height);
         for (unsigned i = 0; i < height; ++i) {
-            pointers.rows[i] = (png_bytep)(surface + (i * rowbytes));
+            pointers.rows[flip ? height - 1 - i : i] = (png_bytep)(surface + (i * rowbytes));
         }
 
         // Read image data

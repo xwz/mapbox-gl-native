@@ -1,23 +1,22 @@
-#include <llmr/text/placement.hpp>
-#include <llmr/map/vector_tile.hpp>
-#include <llmr/geometry/interpolate.hpp>
-#include <llmr/style/bucket_description.hpp>
-#include <llmr/renderer/text_bucket.hpp>
-#include <llmr/util/math.hpp>
-#include <llmr/util/constants.hpp>
+#include <mbgl/text/placement.hpp>
+#include <mbgl/map/vector_tile.hpp>
+#include <mbgl/geometry/interpolate.hpp>
+#include <mbgl/renderer/text_bucket.hpp>
+#include <mbgl/util/math.hpp>
+#include <mbgl/util/constants.hpp>
 
 #include <algorithm>
 
-using namespace llmr;
+using namespace mbgl;
 
 const int Placement::tileExtent = 4096;
 const int Placement::glyphSize =
     24; // size in pixels of this glyphs in the tile
 const float Placement::minScale = 0.5; // underscale by 1 zoom level
 
-Placement::Placement(int8_t zoom)
+Placement::Placement(int8_t zoom, float placementDepth)
     : zoom(zoom),
-      zOffset(log(256.0 / util::tileSize) / log(2)),
+      zOffset(log(512.0 / util::tileSize) / log(2)),
 
       // Calculate the maximum scale we can go down in our fake-3d rtree so that
       // placement still makes sense. This is calculated so that the minimum
@@ -28,7 +27,9 @@ Placement::Placement(int8_t zoom)
       // glyphs be placed, slowing down collision checking. Only place labels if
       // they will show up within the intended zoom range of the tile.
       // TODO make this not hardcoded to 3
-      maxPlacementScale(std::exp(log(2) * util::min((25.5 - zoom), 3.0))) {}
+      maxPlacementScale(std::exp(
+          log(2) *
+          util::min(3.0f, util::min(placementDepth > 0 ? placementDepth : 1.0f, 25.5f - zoom)))) {}
 
 bool byScale(const Anchor &a, const Anchor &b) { return a.scale < b.scale; }
 
@@ -245,7 +246,7 @@ void getGlyphs(PlacedGlyphs &glyphs, GlyphBoxes &boxes,
 }
 
 void Placement::addFeature(TextBucket &bucket, const std::vector<Coordinate> &line,
-                           const BucketTextDescription &info, const GlyphPositions &face,
+                           const StyleBucketText &info, const GlyphPositions &face,
                            const Shaping &shaping) {
     const bool horizontal = info.path == TextPathType::Horizontal;
     const float fontScale = (tileExtent / util::tileSize) / (glyphSize / info.max_size);
@@ -272,7 +273,7 @@ void Placement::addFeature(TextBucket &bucket, const std::vector<Coordinate> &li
         GlyphBoxes boxes;
 
         getGlyphs(glyphs, boxes, anchor, info.translate, shaping, face, fontScale, horizontal, line,
-                  info.max_angle_delta, info.rotate);
+                  info.max_angle_delta * (M_PI/180), info.rotate);
         PlacementProperty place = collision.place(boxes, anchor, anchor.scale, maxPlacementScale,
                                                   info.padding, horizontal, info.always_visible);
         if (place) {
