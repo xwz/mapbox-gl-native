@@ -74,6 +74,16 @@ mbgl::platform::request_http(const std::string &url,
     std::shared_ptr<FoundationRequest> req =
         std::make_shared<FoundationRequest>(url, callback, loop);
 
+    NSString *tileURLString = @(url.c_str());
+    if ([tileURLString hasSuffix:@".png256"]) {
+        NSArray *parts = [tileURLString componentsSeparatedByString:@"/"];
+        int y = [[parts objectAtIndex:[parts count] - 1] intValue];
+        int x = [[parts objectAtIndex:[parts count] - 2] intValue];
+        int z = [[parts objectAtIndex:[parts count] - 3] intValue];
+
+        NSLog(@"requested %f", ((pow(2, z) * y + x) * 32) + z);
+    }
+
     // Note that we are creating a new shared_ptr pointer(!) to make sure there is at least one
     // shared_ptr in existence while the NSURLSession is loading our data. We are making sure in the
     // callback that this pointer gets destroyed again.

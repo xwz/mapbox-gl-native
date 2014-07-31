@@ -12,6 +12,7 @@ RasterTileData::RasterTileData(Tile::ID id, Map &map, const SourceInfo &source)
 
 RasterTileData::~RasterTileData() {
     map.getRasterTileAtlas()->removeTile("test", id.to_uint64());
+//    fprintf(stderr, "remove %llu\n", id.to_uint64());
 }
 
 void RasterTileData::parse() {
@@ -21,6 +22,7 @@ void RasterTileData::parse() {
 
     if (bucket.setImage(data)) {
         map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
+//        fprintf(stderr, "add %llu\n", id.to_uint64());
         state = State::parsed;
     } else {
         state = State::invalid;
@@ -28,8 +30,8 @@ void RasterTileData::parse() {
 }
 
 void RasterTileData::render(Painter &painter, std::shared_ptr<StyleLayer> layer_desc) {
-    Rect<uint16_t> rect = map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
-    map.getRasterTileAtlas()->bind(rect);
+//    Rect<uint16_t> rect = map.getRasterTileAtlas()->addTile("test", id.to_uint64(), bucket.getImage());
+//    map.getRasterTileAtlas()->bind(rect);
     bucket.render(painter, layer_desc, id);
 }
 

@@ -4,7 +4,7 @@
 using namespace mbgl;
 
 RasterBucket::RasterBucket()
-    : raster() {
+    : raster(std::make_shared<Raster>()) {
 }
 
 RasterBucket::~RasterBucket() {
@@ -15,20 +15,20 @@ void RasterBucket::render(Painter &painter, std::shared_ptr<StyleLayer> layer_de
 }
 
 bool RasterBucket::setImage(const std::string &data) {
-    return raster.load(data);
+    return raster->load(data);
 }
 
-Raster& RasterBucket::getImage() {
+std::shared_ptr<Raster> RasterBucket::getImage() {
     return raster;
 }
 
 void RasterBucket::drawRaster(RasterShader& shader, VertexBuffer &vertices, VertexArrayObject &array) {
-    // texture bound by raster tile data
+    // texture bound by raster tile atlas
     shader.setImage(0);
     array.bind(shader, vertices, BUFFER_OFFSET(0));
     glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertices.index());
 }
 
 bool RasterBucket::hasData() const {
-    return raster.isLoaded();
+    return raster->isLoaded();
 }

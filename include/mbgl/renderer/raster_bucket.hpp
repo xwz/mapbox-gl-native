@@ -19,12 +19,12 @@ public:
     virtual bool hasData() const;
 
     bool setImage(const std::string &data);
-    Raster& getImage();
+    std::shared_ptr<Raster> getImage();
 
     void drawRaster(RasterShader& shader, VertexBuffer &vertices, VertexArrayObject &array);
 
 private:
-    Raster raster;
+    std::shared_ptr<Raster> raster;
 };
 
 }

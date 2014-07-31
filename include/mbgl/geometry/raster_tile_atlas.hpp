@@ -23,9 +23,12 @@ class RasterTileAtlas {
         RasterTileAtlas(uint16_t width, uint16_t height);
         ~RasterTileAtlas();
 
-        Rect<uint16_t> addTile(const std::string& source_url, const uint64_t tile_id, const Raster& raster);
+    Rect<uint16_t> addTile(const std::string& source_url, const uint64_t tile_id, const std::shared_ptr<Raster> raster);
         void removeTile(const std::string& source_url, const uint64_t tile_id);
         void bind(Rect<uint16_t> rect);
+
+        inline float getWidth() const { return width; }
+        inline float getHeight() const { return height; }
 
     public:
         const uint16_t width = 0;
