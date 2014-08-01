@@ -9,15 +9,12 @@ class Map;
 
 enum MapChange : uint8_t {
     MapChangeRegionWillChange = 0,
-    MapChangeRegionWillChangeAnimated = 1,
-    MapChangeRegionDidChange = 2,
-    MapChangeRegionDidChangeAnimated = 3,
-    MapChangeWillStartLoadingMap = 4,
-    MapChangeDidFinishLoadingMap = 5,
-    MapChangeDidFailLoadingMap = 6,
-    MapChangeWillStartRenderingMap = 7,
-    MapChangeDidFinishRenderingMap = 8,
-    MapChangeDidFinishRenderingMapFullyRendered = 9
+    MapChangeRegionDidChange = 1,
+    MapChangeWillStartLoadingMap = 2,
+    MapChangeDidFinishLoadingMap = 3,
+    MapChangeDidFailLoadingMap = 4,
+    MapChangeWillStartRenderingMap = 5,
+    MapChangeDidFinishRenderingMap = 6,
 };
 
 class View {
@@ -44,7 +41,7 @@ public:
     // Notifies a watcher of map x/y/scale/rotation changes.
     // Must only be called from the same thread that caused the change.
     // Must not be called from the render thread.
-    virtual void notify_map_change(MapChange change, timestamp delay = 0) = 0;
+    virtual void notify_map_change(MapChange change, timestamp delay = 0, void *context = nullptr) = 0;
 
 protected:
     mbgl::Map *map = nullptr;
