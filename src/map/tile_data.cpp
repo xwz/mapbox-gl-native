@@ -66,7 +66,7 @@ void TileData::request() {
 #if defined(DEBUG)
             fprintf(stderr, "[%s] tile loading failed: %d, %s\n", tile->url.c_str(), res->code, res->error_message.c_str());
 #endif
-            tile_map.notifyTileLoadError(res->error_message);
+            tile_map.notifyTileLoadError(std::make_pair(res->code, res->error_message));
         }
     }, map.getLoop());
 }

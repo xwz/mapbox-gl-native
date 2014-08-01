@@ -481,9 +481,9 @@ void Map::decrementTileLoadingCount() {
     }
 }
 
-void Map::notifyTileLoadError(std::string error_message) {
+void Map::notifyTileLoadError(std::pair<int16_t, std::string> error) {
     std::lock_guard<std::mutex> lock(mtx);
-    view.notify_map_change(MapChangeDidFailLoadingMap);
+    view.notify_map_change(MapChangeDidFailLoadingMap, 0, static_cast<void *>(&error));
 }
 
 void Map::updateTiles() {

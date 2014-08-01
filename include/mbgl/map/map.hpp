@@ -121,7 +121,7 @@ public:
     inline timestamp getTime() const { return animationTime; }
     void incrementTileLoadingCount();
     void decrementTileLoadingCount();
-    void notifyTileLoadError(std::string error_message);
+    void notifyTileLoadError(std::pair<int16_t, std::string> error);
 
 private:
     // uv async callbacks
