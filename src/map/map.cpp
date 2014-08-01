@@ -156,10 +156,19 @@ void Map::render(uv_async_t *async) {
                 map->render();
                 map->is_swapped.clear();
                 map->view.swap();
+                if (!map->render_in_progress) {
+                    map->render_in_progress = true;
+                    map->rendered_fully = true;
+                    map->view.notify_map_change(MapChangeWillStartRenderingMap);
+                }
             } else {
                 // We set the rendered flag in the test above, so we have to reset it
                 // now that we're not actually rendering because the map is clean.
                 map->is_rendered.clear();
+                if (map->render_in_progress) {
+                    map->render_in_progress = false;
+                    map->view.notify_map_change(MapChangeDidFinishRenderingMap, 0, (void *)(map->rendered_fully));
+                }
             }
         }
     }
@@ -482,7 +491,7 @@ void Map::decrementTileLoadingCount() {
 }
 
 void Map::notifyTileLoadError(std::pair<int16_t, std::string> error) {
-    std::lock_guard<std::mutex> lock(mtx);
+    rendered_fully = false;
     view.notify_map_change(MapChangeDidFailLoadingMap, 0, static_cast<void *>(&error));
 }
 

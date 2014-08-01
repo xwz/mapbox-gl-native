@@ -199,7 +199,11 @@ private:
     uv_async_t *async_terminate = nullptr;
     uv_async_t *async_render = nullptr;
     uv_async_t *async_cleanup = nullptr;
+
+    // These are for map change notifications.
     uint8_t tile_loading_count = 0;
+    bool render_in_progress = false;
+    bool rendered_fully = true;
 };
 
 }
