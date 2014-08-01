@@ -21,7 +21,7 @@ public:
 
     void resize(int width, int height);
 
-    void notify_map_change(MapChange change, timestamp delay = 0);
+    void notify_map_change(MapChange change, timestamp delay = 0, void *context = nullptr);
     void make_active();
     void swap();
     unsigned int root_fbo();

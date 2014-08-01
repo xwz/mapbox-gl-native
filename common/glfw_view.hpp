@@ -19,7 +19,7 @@ public:
     void initialize(mbgl::Map *map);
     void swap();
     void make_active();
-    void notify_map_change(mbgl::MapChange change, mbgl::timestamp delay = 0);
+    void notify_map_change(mbgl::MapChange change, mbgl::timestamp delay = 0, void *context = nullptr);
 
     static void key(GLFWwindow *window, int key, int scancode, int action, int mods);
     static void scroll(GLFWwindow *window, double xoffset, double yoffset);

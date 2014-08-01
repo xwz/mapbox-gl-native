@@ -194,7 +194,7 @@ void GLFWView::swap() {
     glfwPostEmptyEvent();
 }
 
-void GLFWView::notify_map_change(mbgl::MapChange change, mbgl::timestamp delay) {
+void GLFWView::notify_map_change(mbgl::MapChange change, mbgl::timestamp delay, void *context) {
     // no-op
 }
 
