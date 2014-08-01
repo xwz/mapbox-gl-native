@@ -33,13 +33,25 @@ const std::string TileData::toString() const {
     return util::sprintf<32>("[tile %d/%d/%d]", id.z, id.x, id.y);
 }
 
+void TileData::trackLoading(bool should_track) {
+    if (should_track && !tracking) {
+        tracking = true;
+        map.incrementTileLoadingCount();
+    } else if (!should_track && tracking) {
+        tracking = false;
+        map.decrementTileLoadingCount();
+    }
+}
+
 void TileData::request() {
     state = State::loading;
 
-    // Note: Somehow this feels slower than the change to request_http()
     std::weak_ptr<TileData> weak_tile = shared_from_this();
-    req = platform::request_http(url, [weak_tile](platform::Response *res) {
+    Map &tile_map = map;
+    trackLoading(true);
+    req = platform::request_http(url, [weak_tile, &tile_map](platform::Response *res) {
         std::shared_ptr<TileData> tile = weak_tile.lock();
+        tile->trackLoading(false);
         if (!tile || tile->state == State::obsolete) {
             // noop. Tile is obsolete and we're now just waiting for the refcount
             // to drop to zero for destruction.
@@ -54,6 +66,7 @@ void TileData::request() {
 #if defined(DEBUG)
             fprintf(stderr, "[%s] tile loading failed: %d, %s\n", tile->url.c_str(), res->code, res->error_message.c_str());
 #endif
+            tile_map.notifyTileLoadError(res->error_message);
         }
     }, map.getLoop());
 }
@@ -61,11 +74,14 @@ void TileData::request() {
 void TileData::cancel() {
     if (state != State::obsolete) {
         state = State::obsolete;
+        trackLoading(false);
         platform::cancel_request_http(req.lock());
     }
 }
 
-void TileData::beforeParse() {}
+void TileData::beforeParse() {
+    trackLoading(false);
+}
 
 void TileData::reparse() {
     beforeParse();

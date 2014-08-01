@@ -44,6 +44,7 @@ public:
     TileData(Tile::ID id, Map &map, const SourceInfo &source);
     ~TileData();
 
+    void trackLoading(bool should_track);
     void request();
     void cancel();
     void reparse();
@@ -69,6 +70,9 @@ public:
 
     // Request-related information.
     const std::string url;
+
+private:
+    bool tracking = false;
 
 protected:
     std::weak_ptr<platform::Request> req;

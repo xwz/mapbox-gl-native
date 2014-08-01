@@ -465,6 +465,27 @@ void Map::updateSources(const std::shared_ptr<StyleLayerGroup> &group) {
     }
 }
 
+void Map::incrementTileLoadingCount() {
+    std::lock_guard<std::mutex> lock(mtx);
+    tile_loading_count++;
+    if (tile_loading_count == 1) {
+        view.notify_map_change(MapChangeWillStartLoadingMap);
+    }
+}
+
+void Map::decrementTileLoadingCount() {
+    std::lock_guard<std::mutex> lock(mtx);
+    tile_loading_count--;
+    if (tile_loading_count == 0) {
+        view.notify_map_change(MapChangeDidFinishLoadingMap);
+    }
+}
+
+void Map::notifyTileLoadError(std::string error_message) {
+    std::lock_guard<std::mutex> lock(mtx);
+    view.notify_map_change(MapChangeDidFailLoadingMap);
+}
+
 void Map::updateTiles() {
     for (const std::shared_ptr<StyleSource> &source : getActiveSources()) {
         source->source->update(*this);

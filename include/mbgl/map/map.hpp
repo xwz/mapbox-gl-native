@@ -118,6 +118,9 @@ public:
     inline std::shared_ptr<uv::loop> getLoop() { return loop; }
     inline timestamp getAnimationTime() const { return animationTime; }
     inline timestamp getTime() const { return animationTime; }
+    void incrementTileLoadingCount();
+    void decrementTileLoadingCount();
+    void notifyTileLoadError(std::string error_message);
 
 private:
     // uv async callbacks
@@ -186,6 +189,8 @@ private:
 
     std::set<std::shared_ptr<StyleSource>> activeSources;
 
+    mutable std::mutex mtx;
+
 private:
     bool async = false;
     std::shared_ptr<uv::loop> loop;
@@ -193,6 +198,7 @@ private:
     uv_async_t *async_terminate = nullptr;
     uv_async_t *async_render = nullptr;
     uv_async_t *async_cleanup = nullptr;
+    uint8_t tile_loading_count = 0;
 };
 
 }
