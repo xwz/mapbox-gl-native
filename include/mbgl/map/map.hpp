@@ -14,6 +14,7 @@
 #include <memory>
 #include <set>
 #include <vector>
+#include <mutex>
 
 namespace mbgl {
 
