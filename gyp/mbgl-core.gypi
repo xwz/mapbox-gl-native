@@ -42,6 +42,7 @@
         }, {
           'cflags_cc': [ '<@(cflags_cc)' ],
           'cflags': [ '<@(cflags)' ],
+          'ldflags': [ '-Wl,--whole-archive' ]
         }]
       ]
     },
