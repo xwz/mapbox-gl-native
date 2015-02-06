@@ -136,7 +136,7 @@ Install the [Android NDK Revision 10d](https://developer.android.com/tools/sdk/n
 
     export ANDROID_NDK_PATH="/dir/to/android-ndk-r10d"
 
-Install the Android SDK. We recommend doing this by way of [Android Studio](https://developer.android.com/sdk/installing/studio.html). To install it, open Android Studio. By default, the SDK will be installed to `~/Library/Android/sdk`. In case you get an error message telling you that it can't find a JVM, it's because you installed a custom Java VM from Oracle. Follow [these instructions](http://tools.android.com/recent/androidstudio1rc3_releasecandidate3released) to start Android Studio. Make sure all environment variables are absolute; don't use `~` to indicate the home directory.
+Install the Android SDK. We recommend doing this by way of [Android Studio](https://developer.android.com/sdk/installing/studio.html). To install it, open Android Studio. By default, the SDK will be installed to `~/Library/Android/sdk`. In case you get an error message telling you that it can't find a JVM, it's because you installed a custom Java VM from Oracle. Follow [these instructions](http://tools.android.com/recent/androidstudio1rc3_releasecandidate3released) to start Android Studio. Make sure all environment variables are absolute; don't use `~` to indicate the home directory. Alternativly, download the [Android Studio Launcher.app](https://s3.amazonaws.com/mapbox/android/Android+Studio+Launcher.zip), which sets the correct path and launches Android Studio.
 
     export ANDROID_HOME="/Users/username/Library/Android/sdk"
 
