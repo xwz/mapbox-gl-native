@@ -4,6 +4,7 @@
 #include <mbgl/storage/response.hpp>
 #include <mbgl/util/std.hpp>
 #include <mbgl/platform/platform.hpp>
+#include <mbgl/platform/log.hpp>
 
 #include "uv_zip.h"
 
@@ -111,7 +112,7 @@ AssetRequestImpl::~AssetRequestImpl() {
 AssetRequestImpl::AssetRequestImpl(AssetRequest *request_, uv_loop_t *loop)
     : context(*AssetZipContext::Get(loop)),
       request(request_),
-      path(request->resource.url.substr(8)) {
+      path(std::string { "assets/" } + request->resource.url.substr(8)) {
     auto zip = context.getHandle();
     if (zip) {
         archiveOpened(zip);

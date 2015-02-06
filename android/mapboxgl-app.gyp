@@ -73,10 +73,11 @@
 
       'copies': [
         {
-          'files': [
-            '../common/ca-bundle.crt',
-            '../styles/styles'
-          ],
+          'files': [ '../common/ca-bundle.crt' ],
+          'destination': '<(pwd)/java/lib/src/main/assets'
+        },
+        {
+          'files': [ '../styles' ],
           'destination': '<(pwd)/java/lib/src/main/assets'
         },
       ],
