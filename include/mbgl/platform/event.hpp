@@ -28,6 +28,7 @@ enum class Event : uint8_t {
     Shader,
     ParseStyle,
     ParseTile,
+    Glyph,
     Render,
     Database,
     HttpRequest,

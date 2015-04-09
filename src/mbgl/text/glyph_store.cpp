@@ -12,6 +12,7 @@
 #include <mbgl/storage/file_source.hpp>
 #include <mbgl/platform/platform.hpp>
 #include <mbgl/util/uv_detail.hpp>
+#include <mbgl/platform/log.hpp>
 #include <algorithm>
 
 namespace mbgl {
@@ -154,15 +155,23 @@ GlyphPBF::GlyphPBF(const std::string &glyphURL,
     env.requestAsync({ Resource::Kind::Glyphs, url }, [&, url](const Response &res) {
         if (res.status != Response::Successful) {
             // Something went wrong with loading the glyph pbf. Pass on the error to the future listeners.
-            const std::string msg = std::string { "[ERROR] failed to load glyphs: " } + res.message;
-            promise.set_exception(std::make_exception_ptr(std::runtime_error(msg)));
+            const std::string msg = std::string { "Failed to load glyphs: " } + res.message;
+            try {
+                promise.set_exception(std::make_exception_ptr(std::runtime_error(msg)));
+            } catch(std::future_error& e) {
+                Log::Error(Event::Glyph, "Failed to set promise exception \"%s\" for %s: %s", &msg, &glyphURL, e.what());
+            }
         } else {
             // Transfer the data to the GlyphSet and signal its availability.
             // Once it is available, the caller will need to call parse() to actually
             // parse the data we received. We are not doing this here since this callback is being
             // called from another (unknown) thread.
             data = res.data;
-            promise.set_value(*this);
+            try {
+                promise.set_value(*this);
+            } catch(std::future_error& e) {
+                Log::Error(Event::Glyph, "Failed to set promise value for %s: %s", &glyphURL, e.what());
+            }
         }
     });
 }

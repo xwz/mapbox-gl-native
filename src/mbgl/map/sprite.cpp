@@ -59,7 +59,11 @@ void Sprite::load(Environment &env) {
         // Treat a non-existent sprite as a successfully loaded empty sprite.
         loadedImage = true;
         loadedJSON = true;
-        promise.set_value();
+        try {
+            promise.set_value();
+        } catch(std::future_error& e) {
+            Log::Warning(Event::Sprite, "Failed to set promise value: %s", e.what());
+        }
         return;
     }
 
@@ -71,8 +75,11 @@ void Sprite::load(Environment &env) {
             sprite->parseJSON();
             sprite->complete();
         } else {
-            Log::Warning(Event::Sprite, "Failed to load sprite info: %s", res.message.c_str());
-            sprite->promise.set_exception(std::make_exception_ptr(std::runtime_error(res.message)));
+            try {
+                sprite->promise.set_exception(std::make_exception_ptr(std::runtime_error(res.message)));
+            } catch(std::future_error& e) {
+                Log::Warning(Event::Sprite, "Failed to load sprite info: %s: %s", e.what(), res.message.c_str());
+            }
         }
     });
 
@@ -82,15 +89,22 @@ void Sprite::load(Environment &env) {
             sprite->parseImage();
             sprite->complete();
         } else {
-            Log::Warning(Event::Sprite, "Failed to load sprite image: %s", res.message.c_str());
-            sprite->promise.set_exception(std::make_exception_ptr(std::runtime_error(res.message)));
+            try {
+                sprite->promise.set_exception(std::make_exception_ptr(std::runtime_error(res.message)));
+            } catch(std::future_error& e) {
+                Log::Warning(Event::Sprite, "Failed to load sprite image: %s: %s", e.what(), res.message.c_str());
+            }
         }
     });
 }
 
 void Sprite::complete() {
     if (loadedImage && loadedJSON) {
-        promise.set_value();
+        try {
+            promise.set_value();
+        } catch(std::future_error& e) {
+            Log::Warning(Event::Sprite, "Failed to set promise value: %s", e.what());
+        }
     }
 }
 
