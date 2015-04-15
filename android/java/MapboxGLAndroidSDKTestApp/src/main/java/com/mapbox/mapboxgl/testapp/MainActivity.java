@@ -316,18 +316,19 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
             switch (position) {
-                // Emerald
+
+                // Mapbox Streets
                 case 0:
-                    mMapFragment.getMap().setStyleUrl("asset://styles/emerald-v7.json");
+                    mMapFragment.getMap().setStyleUrl("asset://styles/mapbox-streets-v7.json");
                     mMapFragment.getMap().removeAllClasses();
                     mClassSpinner.setVisibility(View.INVISIBLE);
                     mClassSpinner.setAdapter(null);
                     mClassSpinner.setOnItemSelectedListener(null);
                     break;
 
-                // Mapbox Streets
+                // Emerald
                 case 1:
-                    mMapFragment.getMap().setStyleUrl("asset://styles/mapbox-streets-v7.json");
+                    mMapFragment.getMap().setStyleUrl("asset://styles/emerald-v7.json");
                     mMapFragment.getMap().removeAllClasses();
                     mClassSpinner.setVisibility(View.INVISIBLE);
                     mClassSpinner.setAdapter(null);

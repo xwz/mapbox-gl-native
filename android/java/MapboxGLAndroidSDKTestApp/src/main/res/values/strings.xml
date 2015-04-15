@@ -12,11 +12,10 @@
     <string name="compass_desc">Map compass. Click to reset the map rotation to North.</string>
 
     <string-array name="style_list">
-        <item>Emerald</item>
         <item>Mapbox Streets</item>
+        <item>Emerald</item>
         <item>Light</item>
         <item>Dark</item>
-        <item>Outdoors</item>
     </string-array>
 
     <string-array name="outdoors_class_list">
