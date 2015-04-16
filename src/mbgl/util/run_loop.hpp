@@ -9,6 +9,21 @@
 #include <queue>
 #include <mutex>
 
+namespace {
+
+template <::std::size_t...>
+struct index_sequence {};
+
+template <::std::size_t N, ::std::size_t... I>
+struct integer_sequence : integer_sequence<N - 1, N - 1, I...> {};
+
+template <::std::size_t... I>
+struct integer_sequence<0, I...> {
+    using type = index_sequence<I...>;
+};
+
+}
+
 namespace mbgl {
 namespace util {
 
@@ -20,9 +35,10 @@ public:
     void stop();
 
     // Invoke fn() in the runloop thread.
-    template <class Fn>
-    void invoke(Fn&& fn) {
-        auto invokable = util::make_unique<Invoker<Fn>>(std::move(fn));
+    template <class Fn, class... Args>
+    void invoke(Fn&& fn, Args&&... args) {
+        auto invokable = util::make_unique<Invoker<Fn, Args...>>(
+            std::move(fn), std::forward_as_tuple(std::forward<Args>(args)...));
         withMutex([&] { queue.push(std::move(invokable)); });
         async.send();
     }
@@ -34,9 +50,7 @@ public:
         assert(outer);
 
         invoke([fn = std::move(fn), callback = std::move(callback), outer] () mutable {
-            outer->invoke([callback = std::move(callback), result = std::move(fn())] () mutable {
-                callback(std::move(result));
-            });
+            outer->invoke(std::move(callback), fn());
         });
     }
 
@@ -65,11 +79,26 @@ private:
         virtual ~Message() = default;
     };
 
-    template <class F>
+    template <class F, class... Args>
     struct Invoker : Message {
-        Invoker(F&& f) : func(std::move(f)) {}
-        void operator()() override { func(); }
+        using P = std::tuple<Args...>;
+
+        Invoker(F&& f, P&& p)
+          : func(std::move(f)),
+            params(std::move(p)) {
+        }
+
+        void operator()() override {
+            invoke(typename integer_sequence<sizeof...(Args)>::type());
+        }
+
+        template<std::size_t... I>
+        void invoke(index_sequence<I...>) {
+             func(std::forward<Args>(std::get<I>(params))...);
+        }
+
         F func;
+        P params;
     };
 
     using Queue = std::queue<std::unique_ptr<Message>>;

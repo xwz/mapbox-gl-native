@@ -9,21 +9,6 @@
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/platform/platform.hpp>
 
-namespace {
-
-template <::std::size_t...>
-struct index_sequence {};
-
-template <::std::size_t N, ::std::size_t... I>
-struct integer_sequence : integer_sequence<N - 1, N - 1, I...> {};
-
-template <::std::size_t... I>
-struct integer_sequence<0, I...> {
-    using type = index_sequence<I...>;
-};
-
-}
-
 namespace mbgl {
 namespace util {
 
@@ -50,11 +35,11 @@ public:
     // Invoke object->fn(args...) in the runloop thread.
     template <typename Fn, class... Args>
     void invoke(Fn fn, Args&&... args) {
-        loop->invoke(std::bind(fn, object, args...));
+        loop->invoke([fn, this] (Args&&... a) { (object->*fn)(std::move(a)...); }, std::forward<Args>(args)...);
     }
 
     // Invoke object->fn(args...) in the runloop thread, then invoke callback(result) in the current thread.
-    template <typename Fn, class R, class... Args>
+    template <class R, typename Fn, class... Args>
     void invokeWithResult(Fn fn, std::function<void (R)>&& callback, Args&&... args) {
         loop->invokeWithResult(std::bind(fn, object, std::move(args)...), std::move(callback));
     }
