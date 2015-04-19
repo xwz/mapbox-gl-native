@@ -11,7 +11,7 @@
 #include <mbgl/platform/platform.hpp>
 #include <mbgl/platform/darwin/reachability.h>
 #include <mbgl/storage/default_file_source.hpp>
-#include <mbgl/storage/default/sqlite_cache.hpp>
+#include <mbgl/storage/sqlite_cache.hpp>
 #include <mbgl/storage/network_status.hpp>
 #include <mbgl/util/geo.hpp>
 
@@ -67,6 +67,7 @@ static NSURL *MGLURLForBundledStyleNamed(NSString *styleName)
 
 @property (nonatomic) EAGLContext *context;
 @property (nonatomic) GLKView *glView;
+@property (nonatomic) UIImageView *glSnapshotView;
 @property (nonatomic) NSOperationQueue *regionChangeDelegateQueue;
 @property (nonatomic) UIImageView *compass;
 @property (nonatomic) UIImageView *logoBug;
@@ -240,6 +241,7 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
     [self insertSubview:_glView atIndex:0];
 
     _glView.contentMode = UIViewContentModeCenter;
+    
     [self setBackgroundColor:[UIColor clearColor]];
 
     // load extensions
@@ -364,6 +366,7 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
     //
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appDidBackground:) name:UIApplicationDidEnterBackgroundNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appWillForeground:) name:UIApplicationWillEnterForegroundNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didReceiveMemoryWarning) name:UIApplicationDidReceiveMemoryWarningNotification object:nil];
 
     // set initial position
     //
@@ -559,8 +562,22 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
 // This is the delegate of the GLKView object's display call.
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect
 {
-    mbglView->resize(rect.size.width, rect.size.height, view.contentScaleFactor, view.drawableWidth, view.drawableHeight);
-    mbglMap->renderSync();
+    if ( ! self.glSnapshotView || self.glSnapshotView.hidden)
+    {
+        mbglView->resize(rect.size.width, rect.size.height, view.contentScaleFactor, view.drawableWidth, view.drawableHeight);
+
+        CGFloat zoomFactor   = mbglMap->getMaxZoom() - mbglMap->getMinZoom() + 1;
+        CGFloat cpuFactor    = (CGFloat)[[NSProcessInfo processInfo] processorCount];
+        CGFloat memoryFactor = (CGFloat)[[NSProcessInfo processInfo] physicalMemory] / 1000 / 1000 / 1000;
+        CGFloat sizeFactor   = ((CGFloat)mbglMap->getState().getWidth()  / mbgl::util::tileSize) *
+                               ((CGFloat)mbglMap->getState().getHeight() / mbgl::util::tileSize);
+
+        NSUInteger cacheSize = zoomFactor * cpuFactor * memoryFactor * sizeFactor * 0.5;
+
+        mbglMap->setSourceTileCacheSize(cacheSize);
+
+        mbglMap->renderSync();
+    }
 }
 
 // This gets called when the view dimension changes, e.g. because the device is being rotated.
@@ -582,7 +599,17 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
 - (void)appDidBackground:(NSNotification *)notification
 {
     [MGLMapboxEvents flush];
-    
+
+    if ( ! self.glSnapshotView)
+    {
+        self.glSnapshotView = [[UIImageView alloc] initWithFrame:self.glView.frame];
+        self.glSnapshotView.autoresizingMask = self.glView.autoresizingMask;
+        [self insertSubview:self.glSnapshotView aboveSubview:self.glView];
+    }
+
+    self.glSnapshotView.image = self.glView.snapshot;
+    self.glSnapshotView.hidden = NO;
+
     mbglMap->stop();
 
     [self.glView deleteDrawable];
@@ -590,6 +617,8 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
 
 - (void)appWillForeground:(NSNotification *)notification
 {
+    self.glSnapshotView.hidden = YES;
+
     [self.glView bindDrawable];
 
     mbglMap->start();
@@ -1142,6 +1171,11 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
 - (void)toggleDebug
 {
     mbglMap->toggleDebug();
+}
+
+- (void)emptyMemoryCache
+{
+    mbglMap->onLowMemory();
 }
 
 #pragma mark - Geography -
@@ -2428,7 +2462,8 @@ class MBGLView : public mbgl::View
         [EAGLContext setCurrentContext:nil];
     }
 
-    void resize(uint16_t width, uint16_t height, float ratio, uint16_t fbWidth, uint16_t fbHeight) {
+    void resize(uint16_t width, uint16_t height, float ratio, uint16_t fbWidth, uint16_t fbHeight)
+    {
         View::resize(width, height, ratio, fbWidth, fbHeight);
     }
 
@@ -2542,6 +2577,11 @@ class MBGLView : public mbgl::View
 - (void)setAllowsRotating:(BOOL)allowsRotating
 {
     self.rotateEnabled = allowsRotating;
+}
+
+- (void)didReceiveMemoryWarning
+{
+    mbglMap->onLowMemory();
 }
 
 @end
