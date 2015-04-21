@@ -269,6 +269,10 @@ int GLFWView::run() {
 
     while (!glfwWindowShouldClose(window)) {
         glfwWaitEvents();
+        const bool dirty = !clean.test_and_set();
+        if (dirty) {
+            map->renderSync();
+        }
     }
 
     map->stop([]() {
@@ -294,8 +298,11 @@ void GLFWView::notify() {
 }
 
 void GLFWView::invalidate() {
-    assert(map);
-    map->render();
+    clean.clear();
+    glfwPostEmptyEvent();
+}
+
+void GLFWView::swap() {
     glfwSwapBuffers(window);
     fps();
 }

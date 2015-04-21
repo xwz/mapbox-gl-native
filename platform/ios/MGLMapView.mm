@@ -2474,6 +2474,11 @@ class MBGLView : public mbgl::View
                                   waitUntilDone:NO];
     }
 
+    void swap() override
+    {
+        // no-op
+    }
+
     private:
         __weak MGLMapView *nativeView = nullptr;
 };

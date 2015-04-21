@@ -329,8 +329,11 @@ void HeadlessView::deactivate() {
 }
 
 void HeadlessView::invalidate() {
-    assert(map);
-    map->render();
+    // no-op
+}
+
+void HeadlessView::swap() {
+    // no-op
 }
 
 }

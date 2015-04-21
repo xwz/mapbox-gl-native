@@ -43,6 +43,9 @@ public:
     // (i.e. map->renderSync() or map->renderAsync() must be called as a result of this)
     virtual void invalidate() = 0;
 
+    // Called from the render thread after the render is complete.
+    virtual void swap() = 0;
+
     // Called from the render (=GL) thread. Signals that the contents of the contents
     // may be discarded. The default is a no-op.
     virtual void discard();

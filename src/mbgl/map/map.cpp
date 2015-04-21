@@ -58,7 +58,7 @@ const static bool uvVersionCheck = []() {
     return true;
 }();
 
-using namespace mbgl;
+namespace mbgl {
 
 Map::Map(View& view_, FileSource& fileSource_)
     : env(util::make_unique<Environment>(fileSource_)),
@@ -137,7 +137,6 @@ void Map::start(bool startPaused, Mode renderMode) {
         terminating = true;
 
         // Closes all open handles on the loop. This means that the loop will automatically terminate.
-        asyncRender.reset();
         asyncUpdate.reset();
         asyncInvoke.reset();
         asyncTerminate.reset();
@@ -153,20 +152,6 @@ void Map::start(bool startPaused, Mode renderMode) {
 
     asyncInvoke = util::make_unique<uv::async>(env->loop, [this] {
         processTasks();
-    });
-
-    asyncRender = util::make_unique<uv::async>(env->loop, [this] {
-        // Must be called in Map thread.
-        assert(Environment::currentlyOn(ThreadType::Map));
-
-        render();
-
-        // Finally, notify all listeners that we have finished rendering this frame.
-        {
-            std::lock_guard<std::mutex> lk(mutexRendered);
-            rendered = true;
-        }
-        condRendered.notify_all();
     });
 
     // Do we need to pause first?
@@ -314,7 +299,6 @@ void Map::run() {
                 asyncTerminate->ref();
                 asyncUpdate->ref();
                 asyncInvoke->ref();
-                asyncRender->ref();
             }
         }
     } else {
@@ -331,11 +315,21 @@ void Map::renderSync() {
     // Must be called in UI thread.
     assert(Environment::currentlyOn(ThreadType::Main));
 
-    triggerRender();
+    invokeSyncTask([=] {
+        render();
+    });
+}
 
-    std::unique_lock<std::mutex> lock(mutexRendered);
-    condRendered.wait(lock, [this] { return rendered; });
-    rendered = false;
+
+void Map::renderAsync() {
+    // Must be called in UI thread.
+    assert(Environment::currentlyOn(ThreadType::Main));
+
+    fprintf(stderr, "renderAsync\n");
+
+    invokeTask([=] {
+        render();
+    });
 }
 
 void Map::triggerUpdate(const Update u) {
@@ -345,12 +339,6 @@ void Map::triggerUpdate(const Update u) {
         asyncUpdate->ref();
         asyncUpdate->send();
     }
-}
-
-void Map::triggerRender() {
-    assert(mode == Mode::Continuous);
-    assert(asyncRender);
-    asyncRender->send();
 }
 
 // Runs the function in the map thread.
@@ -365,10 +353,21 @@ void Map::invokeTask(std::function<void()>&& fn) {
     }
 }
 
-template <typename Fn> auto Map::invokeSyncTask(const Fn& fn) -> decltype(fn()) {
-    std::promise<decltype(fn())> promise;
-    invokeTask([&fn, &promise] { promise.set_value(fn()); });
+template <typename R, typename Fn> R Map::invokeSyncTask(const Fn& fn) {
+    std::promise<R> promise;
+    invokeTask([&] {
+        promise.set_value(fn());
+    });
     return promise.get_future().get();
+}
+
+template <typename Fn> void Map::invokeSyncTask(const Fn& fn) {
+    std::promise<void> promise;
+    invokeTask([&] {
+        fn();
+        promise.set_value();
+    });
+    promise.get_future().get();
 }
 
 // Processes the functions that should be run in the map thread.
@@ -598,7 +597,7 @@ void Map::setDefaultPointAnnotationSymbol(const std::string& symbol) {
 
 double Map::getTopOffsetPixelsForAnnotationSymbol(const std::string& symbol) {
     assert(Environment::currentlyOn(ThreadType::Main));
-    return invokeSyncTask([&] {
+    return invokeSyncTask<double>([&] {
         assert(sprite);
         const SpritePosition pos = sprite->getSpritePosition(symbol);
         return -pos.height / pos.pixelRatio / 2;
@@ -611,7 +610,7 @@ uint32_t Map::addPointAnnotation(const LatLng& point, const std::string& symbol)
 
 std::vector<uint32_t> Map::addPointAnnotations(const std::vector<LatLng>& points, const std::vector<std::string>& symbols) {
     assert(Environment::currentlyOn(ThreadType::Main));
-    return invokeSyncTask([&] {
+    return invokeSyncTask<std::vector<uint32_t>>([&] {
         auto result = annotationManager->addPointAnnotations(points, symbols, *this);
         updateAnnotationTiles(result.first);
         return result.second;
@@ -633,14 +632,14 @@ void Map::removeAnnotations(const std::vector<uint32_t>& annotations) {
 
 std::vector<uint32_t> Map::getAnnotationsInBounds(const LatLngBounds& bounds) {
     assert(Environment::currentlyOn(ThreadType::Main));
-    return invokeSyncTask([&] {
+    return invokeSyncTask<std::vector<uint32_t>>([&] {
         return annotationManager->getAnnotationsInBounds(bounds, *this);
     });
 }
 
 LatLngBounds Map::getBoundsForAnnotations(const std::vector<uint32_t>& annotations) {
     assert(Environment::currentlyOn(ThreadType::Main));
-    return invokeSyncTask([&] {
+    return invokeSyncTask<LatLngBounds>([&] {
         return annotationManager->getBoundsForAnnotations(annotations);
     });
 }
@@ -813,7 +812,6 @@ void Map::prepare() {
         asyncTerminate->unref();
         asyncUpdate->unref();
         asyncInvoke->unref();
-        asyncRender->unref();
     }
 
     if (style) {
@@ -856,6 +854,8 @@ void Map::render() {
 
     painter->render(*style, state, data->getAnimationTime());
 
+    view.swap();
+
     // Schedule another rerender when we definitely need a next frame.
     if (transform.needsTransition() || style->hasTransitions()) {
         triggerUpdate();
@@ -884,3 +884,5 @@ void Map::onLowMemory() {
         env->performCleanup();
     });
 };
+
+}

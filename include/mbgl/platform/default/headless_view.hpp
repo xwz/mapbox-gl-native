@@ -35,6 +35,7 @@ public:
     void notify() override;
     void invalidate() override;
     void discard() override;
+    void swap() override;
     std::unique_ptr<StillImage> readStillImage() override;
 
 private:

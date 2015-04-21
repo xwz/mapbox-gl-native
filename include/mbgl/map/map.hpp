@@ -76,18 +76,14 @@ public:
     using StillImageCallback = std::function<void(std::unique_ptr<const StillImage>)>;
     void renderStill(StillImageCallback callback);
 
-    // Triggers a synchronous or asynchronous render.
+    // Triggers a synchronous render.
     void renderSync();
 
-    // Unconditionally performs a render with the current map state. May only be called from the Map
-    // thread.
-    void render();
+    // Triggers an asynchronous render.
+    void renderAsync();
 
     // Notifies the Map thread that the state has changed and an update might be necessary.
     void triggerUpdate(Update = Update::Nothing);
-
-    // Triggers a render. Can be called from any thread.
-    void triggerRender();
 
     // Releases resources immediately
     void terminate();
@@ -178,6 +174,10 @@ private:
     // frame is completely rendered.
     void run();
 
+    // Unconditionally performs a render with the current map state. May only be called from the Map
+    // thread.
+    void render();
+
     // This may only be called by the View object.
     void resize(uint16_t width, uint16_t height, float ratio = 1);
     void resize(uint16_t width, uint16_t height, float ratio, uint16_t fbWidth, uint16_t fbHeight);
@@ -206,7 +206,8 @@ private:
 
     // Runs the function in the map thread.
     void invokeTask(std::function<void()>&&);
-    template <typename Fn> auto invokeSyncTask(const Fn& fn) -> decltype(fn());
+    template <typename R, typename Fn> R invokeSyncTask(const Fn& fn);
+    template <typename Fn> void invokeSyncTask(const Fn& fn);
 
     void processTasks();
 
@@ -226,7 +227,6 @@ private:
     std::unique_ptr<uv::async> asyncTerminate;
     std::unique_ptr<uv::async> asyncUpdate;
     std::unique_ptr<uv::async> asyncInvoke;
-    std::unique_ptr<uv::async> asyncRender;
 
     bool terminating = false;
     bool pausing = false;
@@ -235,11 +235,6 @@ private:
     std::condition_variable condRun;
     std::mutex mutexPause;
     std::condition_variable condPause;
-
-    // Used to signal that rendering completed.
-    bool rendered = false;
-    std::condition_variable condRendered;
-    std::mutex mutexRendered;
 
     // Stores whether the map thread has been stopped already.
     std::atomic_bool isStopped;
