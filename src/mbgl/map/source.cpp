@@ -252,7 +252,7 @@ TileData::State Source::addTile(Map &map, Worker &worker,
         // If we don't find working tile data, we're just going to load it.
         if (info.type == SourceType::Vector) {
             new_tile.data =
-                std::make_shared<VectorTileData>(normalized_id, map.getMaxZoom(), style, glyphAtlas,
+                std::make_shared<VectorTileData>(normalized_id, 18, style, glyphAtlas,
                                                  glyphStore, spriteAtlas, sprite, info);
             new_tile.data->request(worker, map.getState().getPixelRatio(), callback);
         } else if (info.type == SourceType::Raster) {
@@ -261,7 +261,7 @@ TileData::State Source::addTile(Map &map, Worker &worker,
         } else if (info.type == SourceType::Annotations) {
             AnnotationManager& annotationManager = map.getAnnotationManager();
             new_tile.data = std::make_shared<LiveTileData>(normalized_id, annotationManager,
-                                                           map.getMaxZoom(), style, glyphAtlas,
+                                                           18, style, glyphAtlas,
                                                            glyphStore, spriteAtlas, sprite, info);
             new_tile.data->reparse(worker, callback);
         } else {
@@ -401,7 +401,7 @@ void Source::update(Map &map,
     if (info.type != SourceType::Raster && cache.getSize() == 0) {
         size_t conservativeCacheSize = ((float)map.getState().getWidth()  / util::tileSize) *
                                        ((float)map.getState().getHeight() / util::tileSize) *
-                                       (map.getMaxZoom() - map.getMinZoom() + 1) *
+                                       (18 - 0 + 1) *
                                        0.5;
         cache.setSize(conservativeCacheSize);
     }

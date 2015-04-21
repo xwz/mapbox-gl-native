@@ -81,6 +81,8 @@ int main(int argc, char *argv[]) {
 
 
     HeadlessView view;
+    view.resize(width, height, pixelRatio);
+
     Map map(view, fileSource);
 
     map.start(Map::Mode::Still);
@@ -92,8 +94,7 @@ int main(int argc, char *argv[]) {
 
     map.setStyleJSON(style, ".");
     map.setClasses(classes);
-
-    view.resize(width, height, pixelRatio);
+    map.resize(width, height, pixelRatio);
     map.setLatLngZoom({ lat, lon }, zoom);
     map.setBearing(bearing);
 

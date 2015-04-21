@@ -79,9 +79,6 @@ public:
     // Triggers a synchronous render.
     void renderSync();
 
-    // Triggers an asynchronous render.
-    void renderAsync();
-
     // Notifies the Map thread that the state has changed and an update might be necessary.
     void triggerUpdate(Update = Update::Nothing);
 
@@ -105,6 +102,9 @@ public:
     // Transition
     void cancelTransitions();
     void setGestureInProgress(bool);
+
+    // Size
+    void resize(uint16_t width, uint16_t height, float ratio = 1);
 
     // Position
     void moveBy(double dx, double dy, Duration = Duration::zero());
@@ -140,8 +140,8 @@ public:
     inline double getMetersPerPixelAtLatitude(const double lat, const double zoom) const { return Projection::getMetersPerPixelAtLatitude(lat, zoom); }
     inline const ProjectedMeters projectedMetersForLatLng(const LatLng latLng) const { return Projection::projectedMetersForLatLng(latLng); }
     inline const LatLng latLngForProjectedMeters(const ProjectedMeters projectedMeters) const { return Projection::latLngForProjectedMeters(projectedMeters); }
-    inline const vec2<double> pixelForLatLng(const LatLng latLng) const { return state.pixelForLatLng(latLng); }
-    inline const LatLng latLngForPixel(const vec2<double> pixel) const { return state.latLngForPixel(pixel); }
+    inline const vec2<double> pixelForLatLng(const LatLng latLng) const { return transform.currentState().pixelForLatLng(latLng); }
+    inline const LatLng latLngForPixel(const vec2<double> pixel) const { return transform.currentState().latLngForPixel(pixel); }
 
     // Annotations
     void setDefaultPointAnnotationSymbol(const std::string&);
@@ -164,7 +164,7 @@ public:
     void toggleDebug();
     bool getDebug() const;
 
-    inline const TransformState &getState() const { return state; }
+    const TransformState& getState() const;
     TimePoint getTime() const;
     inline AnnotationManager& getAnnotationManager() const { return *annotationManager; }
 
@@ -178,10 +178,6 @@ private:
     // thread.
     void render();
 
-    // This may only be called by the View object.
-    void resize(uint16_t width, uint16_t height, float ratio = 1);
-    void resize(uint16_t width, uint16_t height, float ratio, uint16_t fbWidth, uint16_t fbHeight);
-
     util::ptr<Sprite> getSprite();
     Worker& getWorker();
 
@@ -193,16 +189,13 @@ private:
 
     void updateTiles();
 
-    // Triggered by triggerUpdate();
-    void update();
-
     // Loads the style set in the data object. Called by Update::StyleInfo
     void reloadStyle();
     void loadStyleJSON(const std::string& json, const std::string& base);
 
     // Prepares a map render by updating the tiles we need for the current view, as well as updating
     // the stylesheet.
-    void prepare();
+    void prepare(UpdateType updated);
 
     // Runs the function in the map thread.
     void invokeTask(std::function<void()>&&);
@@ -225,7 +218,6 @@ private:
     std::unique_ptr<Worker> workers;
     std::thread thread;
     std::unique_ptr<uv::async> asyncTerminate;
-    std::unique_ptr<uv::async> asyncUpdate;
     std::unique_ptr<uv::async> asyncInvoke;
 
     bool terminating = false;
@@ -256,7 +248,7 @@ private:
 
     const std::unique_ptr<MapData> data;
 
-    std::atomic<UpdateType> updated;
+    UpdateType updated;
 
     std::mutex mutexTask;
     std::queue<std::function<void()>> tasks;

@@ -27,6 +27,7 @@ public:
 
     void cascade(const std::vector<std::string>&);
     void recalculate(float z, TimePoint now);
+    bool isInitialized() const;
 
     void setDefaultTransitionDuration(Duration);
     bool hasTransitions() const;
@@ -39,6 +40,7 @@ public:
     std::string base;
 
 private:
+    bool initialized = false;
     std::string sprite_url;
     PropertyTransition defaultTransition;
     std::unique_ptr<uv::rwlock> mtx;

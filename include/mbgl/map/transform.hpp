@@ -6,6 +6,7 @@
 #include <mbgl/map/update.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/noncopyable.hpp>
+#include <mbgl/util/util.hpp>
 #include <mbgl/util/vec.hpp>
 
 #include <cstdint>
@@ -19,19 +20,19 @@ class View;
 namespace util { class transition; }
 
 class Transform : private util::noncopyable {
+    MBGL_STORE_THREAD(tid)
+
 public:
     Transform(View &view);
 
     // Map view
-    // Note: width * ratio does not necessarily equal fb_width
-    bool resize(uint16_t width, uint16_t height, float ratio,
-                uint16_t fb_width, uint16_t fb_height);
+    bool resize(uint16_t width, uint16_t height, float ratio);
 
     // Position
     void moveBy(double dx, double dy, Duration = Duration::zero());
     void setLatLng(LatLng latLng, Duration = Duration::zero());
     void setLatLngZoom(LatLng latLng, double zoom, Duration = Duration::zero());
-    inline const LatLng getLatLng() const { return current.getLatLng(); }
+    const LatLng getLatLng() const;
 
     // Zoom
     void scaleBy(double ds, double cx = -1, double cy = -1, Duration = Duration::zero());
@@ -71,8 +72,6 @@ private:
     void constrain(double& scale, double& y) const;
 
     View &view;
-
-    mutable std::recursive_mutex mtx;
 
     // This reflects the current state of the transform, representing the actual position of the
     // map. After calling a transform function with a timer, this will likely remain the same until

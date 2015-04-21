@@ -36,6 +36,8 @@ void Style::cascade(const std::vector<std::string>& classes) {
 void Style::recalculate(float z, TimePoint now) {
     uv::writelock lock(mtx);
 
+    initialized = true;
+
     for (const auto& source : sources) {
         source->enabled = false;
     }
@@ -49,6 +51,11 @@ void Style::recalculate(float z, TimePoint now) {
         }
     }
 }
+
+bool Style::isInitialized() const {
+    return initialized;
+}
+
 
 const std::string &Style::getSpriteURL() const {
     return sprite_url;

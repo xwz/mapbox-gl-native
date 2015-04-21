@@ -9,23 +9,28 @@
 #include <mbgl/platform/platform.hpp>
 
 #include <cstdio>
+#include <cassert>
 
-using namespace mbgl;
+namespace {
 
-/** Converts the given angle (in radians) to be numerically close to the anchor angle, allowing it to be interpolated properly without sudden jumps. */
-static double _normalizeAngle(double angle, double anchorAngle)
-{
-    angle = util::wrap(angle, -M_PI, M_PI);
+// Converts the given angle (in radians) to be numerically close to the anchor angle, allowing it to
+// be interpolated properly without sudden jumps.
+static double _normalizeAngle(double angle, double anchorAngle) {
+    angle = mbgl::util::wrap(angle, -M_PI, M_PI);
     double diff = std::abs(angle - anchorAngle);
-    if (std::abs(angle - util::M2PI - anchorAngle) < diff) {
-        angle -= util::M2PI;
+    if (std::abs(angle - mbgl::util::M2PI - anchorAngle) < diff) {
+        angle -= mbgl::util::M2PI;
     }
-    if (std::abs(angle + util::M2PI - anchorAngle) < diff) {
-        angle += util::M2PI;
+    if (std::abs(angle + mbgl::util::M2PI - anchorAngle) < diff) {
+        angle += mbgl::util::M2PI;
     }
-    
+
     return angle;
 }
+
+}
+
+namespace mbgl {
 
 Transform::Transform(View &view_)
     : view(view_)
@@ -34,9 +39,11 @@ Transform::Transform(View &view_)
 
 #pragma mark - Map View
 
-bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
-                       const uint16_t fb_w, const uint16_t fb_h) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio) {
+    MBGL_VERIFY_THREAD(tid);
+
+    const uint32_t fb_w = w * ratio;
+    const uint32_t fb_h = h * ratio;
 
     if (final.width != w || final.height != h || final.pixelRatio != ratio ||
         final.framebuffer[0] != fb_w || final.framebuffer[1] != fb_h) {
@@ -61,13 +68,13 @@ bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
 #pragma mark - Position
 
 void Transform::moveBy(const double dx, const double dy, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     _moveBy(dx, dy, duration);
 }
 
 void Transform::_moveBy(const double dx, const double dy, const Duration duration) {
-    // This is only called internally, so we don't need a lock here.
+    MBGL_VERIFY_THREAD(tid);
 
     view.notifyMapChange(duration != Duration::zero() ?
                            MapChangeRegionWillChangeAnimated :
@@ -104,7 +111,7 @@ void Transform::_moveBy(const double dx, const double dy, const Duration duratio
 }
 
 void Transform::setLatLng(const LatLng latLng, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     const double m = 1 - 1e-15;
     const double f = std::fmin(std::fmax(std::sin(util::DEG2RAD * latLng.latitude), -m), m);
@@ -116,7 +123,7 @@ void Transform::setLatLng(const LatLng latLng, const Duration duration) {
 }
 
 void Transform::setLatLngZoom(const LatLng latLng, const double zoom, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     double new_scale = std::pow(2.0, zoom);
 
@@ -133,11 +140,17 @@ void Transform::setLatLngZoom(const LatLng latLng, const double zoom, const Dura
     _setScaleXY(new_scale, xn, yn, duration);
 }
 
+const LatLng Transform::getLatLng() const {
+    MBGL_VERIFY_THREAD(tid);
+
+    return current.getLatLng();
+}
+
 
 #pragma mark - Zoom
 
 void Transform::scaleBy(const double ds, const double cx, const double cy, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     // clamp scale to min/max values
     double new_scale = current.scale * ds;
@@ -152,30 +165,32 @@ void Transform::scaleBy(const double ds, const double cx, const double cy, const
 
 void Transform::setScale(const double scale, const double cx, const double cy,
                          const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     _setScale(scale, cx, cy, duration);
 }
 
 void Transform::setZoom(const double zoom, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     _setScale(std::pow(2.0, zoom), -1, -1, duration);
 }
 
 double Transform::getZoom() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     return final.getZoom();
 }
 
 double Transform::getScale() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     return final.scale;
 }
 
 double Transform::getMinZoom() const {
+    MBGL_VERIFY_THREAD(tid);
+
     double test_scale = current.scale;
     double test_y = current.y;
     constrain(test_scale, test_y);
@@ -184,11 +199,13 @@ double Transform::getMinZoom() const {
 }
 
 double Transform::getMaxZoom() const {
+    MBGL_VERIFY_THREAD(tid);
+
     return std::log2(max_scale);
 }
 
 void Transform::_setScale(double new_scale, double cx, double cy, const Duration duration) {
-    // This is only called internally, so we don't need a lock here.
+    MBGL_VERIFY_THREAD(tid);
 
     // Ensure that we don't zoom in further than the maximum allowed.
     if (new_scale < min_scale) {
@@ -222,7 +239,7 @@ void Transform::_setScale(double new_scale, double cx, double cy, const Duration
 
 void Transform::_setScaleXY(const double new_scale, const double xn, const double yn,
                             const Duration duration) {
-    // This is only called internally, so we don't need a lock here.
+    MBGL_VERIFY_THREAD(tid);
 
     view.notifyMapChange(duration != Duration::zero() ?
                            MapChangeRegionWillChangeAnimated :
@@ -271,6 +288,8 @@ void Transform::_setScaleXY(const double new_scale, const double xn, const doubl
 #pragma mark - Constraints
 
 void Transform::constrain(double& scale, double& y) const {
+    MBGL_VERIFY_THREAD(tid);
+
     // Constrain minimum zoom to avoid zooming out far enough to show off-world areas.
     if (scale < (current.height / util::tileSize)) scale = (current.height / util::tileSize);
 
@@ -285,7 +304,7 @@ void Transform::constrain(double& scale, double& y) const {
 
 void Transform::rotateBy(const double start_x, const double start_y, const double end_x,
                          const double end_y, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     double center_x = current.width / 2, center_y = current.height / 2;
 
@@ -315,13 +334,13 @@ void Transform::rotateBy(const double start_x, const double start_y, const doubl
 }
 
 void Transform::setAngle(const double new_angle, const Duration duration) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     _setAngle(new_angle, duration);
 }
 
 void Transform::setAngle(const double new_angle, const double cx, const double cy) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     double dx = 0, dy = 0;
 
@@ -339,7 +358,7 @@ void Transform::setAngle(const double new_angle, const double cx, const double c
 }
 
 void Transform::_setAngle(double new_angle, const Duration duration) {
-    // This is only called internally, so we don't need a lock here.
+    MBGL_VERIFY_THREAD(tid);
 
     view.notifyMapChange(duration != Duration::zero() ?
                            MapChangeRegionWillChangeAnimated :
@@ -370,7 +389,7 @@ void Transform::_setAngle(double new_angle, const Duration duration) {
 }
 
 double Transform::getAngle() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     return final.angle;
 }
@@ -381,6 +400,8 @@ double Transform::getAngle() const {
 void Transform::startTransition(std::function<Update(double)> frame,
                                 std::function<void()> finish,
                                 Duration duration) {
+    MBGL_VERIFY_THREAD(tid);
+
     if (transitionFinishFn) {
         transitionFinishFn();
     }
@@ -406,17 +427,19 @@ void Transform::startTransition(std::function<Update(double)> frame,
 }
 
 bool Transform::needsTransition() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
+
     return !!transitionFrameFn;
 }
 
 UpdateType Transform::updateTransitions(const TimePoint now) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
+
     return static_cast<UpdateType>(transitionFrameFn ? transitionFrameFn(now) : Update::Nothing);
 }
 
 void Transform::cancelTransitions() {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     if (transitionFinishFn) {
         transitionFinishFn();
@@ -427,7 +450,7 @@ void Transform::cancelTransitions() {
 }
 
 void Transform::setGestureInProgress(bool inProgress) {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     current.gestureInProgress = inProgress;
 }
@@ -435,13 +458,15 @@ void Transform::setGestureInProgress(bool inProgress) {
 #pragma mark - Transform state
 
 const TransformState Transform::currentState() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     return current;
 }
 
 const TransformState Transform::finalState() const {
-    std::lock_guard<std::recursive_mutex> lock(mtx);
+    MBGL_VERIFY_THREAD(tid);
 
     return final;
+}
+
 }

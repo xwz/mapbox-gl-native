@@ -137,17 +137,8 @@ void Map::start(bool startPaused, Mode renderMode) {
         terminating = true;
 
         // Closes all open handles on the loop. This means that the loop will automatically terminate.
-        asyncUpdate.reset();
         asyncInvoke.reset();
         asyncTerminate.reset();
-    });
-
-    asyncUpdate = util::make_unique<uv::async>(env->loop, [this] {
-        // Whenever we call triggerUpdate(), we ref() the asyncUpdate handle to make sure that all
-        // of the calls actually get triggered.
-        asyncUpdate->unref();
-
-        update();
     });
 
     asyncInvoke = util::make_unique<uv::async>(env->loop, [this] {
@@ -244,7 +235,20 @@ void Map::renderStill(StillImageCallback fn) {
 
     callback = std::move(fn);
 
+    const auto now = Clock::now();
+    data->setAnimationTime(now);
+    transform.updateTransitions(now);
+    auto renderState = transform.currentState();
+
     triggerUpdate(Update::RenderStill);
+
+    const auto u = updated;
+    updated = static_cast<UpdateType>(Update::Nothing);
+
+    invokeSyncTask([=] {
+        state = renderState;
+        prepare(u);
+    });
 }
 
 void Map::run() {
@@ -259,12 +263,10 @@ void Map::run() {
     auto styleInfo = data->getStyleInfo();
 
     view.activate();
-    view.discard();
 
     workers = util::make_unique<Worker>(env->loop, 4);
 
     setup();
-    prepare();
 
     if (mode == Mode::Continuous) {
         terminating = false;
@@ -279,7 +281,7 @@ void Map::run() {
 
             // After the loop terminated, these async handles may have been deleted if the terminate()
             // callback was fired. In this case, we are exiting the loop.
-            if (asyncTerminate && asyncUpdate) {
+            if (asyncTerminate) {
                  // Otherwise, loop termination means that we have acquired and parsed all resources
                 // required for this map image and we can now proceed to rendering.
                 render();
@@ -297,7 +299,6 @@ void Map::run() {
                 // To prepare for the next event loop run, we have to make sure the async handles keep
                 // the loop alive.
                 asyncTerminate->ref();
-                asyncUpdate->ref();
                 asyncInvoke->ref();
             }
         }
@@ -315,29 +316,33 @@ void Map::renderSync() {
     // Must be called in UI thread.
     assert(Environment::currentlyOn(ThreadType::Main));
 
-    invokeSyncTask([=] {
+    const auto now = Clock::now();
+    data->setAnimationTime(now);
+    transform.updateTransitions(now);
+    auto renderState = transform.currentState();
+
+    const auto u = updated;
+    updated = static_cast<UpdateType>(Update::Nothing);
+
+    invokeSyncTask([&] {
+        state = renderState;
+        prepare(u);
         render();
     });
-}
 
-
-void Map::renderAsync() {
-    // Must be called in UI thread.
-    assert(Environment::currentlyOn(ThreadType::Main));
-
-    fprintf(stderr, "renderAsync\n");
-
-    invokeTask([=] {
-        render();
-    });
+    if (transform.needsTransition()) {
+        view.invalidate();
+    }
 }
 
 void Map::triggerUpdate(const Update u) {
-    updated |= static_cast<UpdateType>(u);
+    // Must be called in UI thread.
+    assert(Environment::currentlyOn(ThreadType::Main));
 
-    if (asyncUpdate) {
-        asyncUpdate->ref();
-        asyncUpdate->send();
+    const bool clean = updated == static_cast<UpdateType>(Update::Nothing);
+    updated |= static_cast<UpdateType>(u);
+    if (clean) {
+        view.invalidate();
     }
 }
 
@@ -462,11 +467,7 @@ util::ptr<Sprite> Map::getSprite() {
 #pragma mark - Size
 
 void Map::resize(uint16_t width, uint16_t height, float ratio) {
-    resize(width, height, ratio, width * ratio, height * ratio);
-}
-
-void Map::resize(uint16_t width, uint16_t height, float ratio, uint16_t fbWidth, uint16_t fbHeight) {
-    if (transform.resize(width, height, ratio, fbWidth, fbHeight)) {
+    if (transform.resize(width, height, ratio)) {
         triggerUpdate();
     }
 }
@@ -671,6 +672,11 @@ bool Map::getDebug() const {
     return data->getDebug();
 }
 
+const TransformState& Map::getState() const {
+    assert(Environment::currentlyOn(ThreadType::Map));
+    return state;
+}
+
 TimePoint Map::getTime() const {
     return data->getAnimationTime();
 }
@@ -719,16 +725,8 @@ void Map::updateTiles() {
         source->update(*this, getWorker(), style, *glyphAtlas, *glyphStore,
                                *spriteAtlas, getSprite(), *texturePool, [this]() {
             assert(Environment::currentlyOn(ThreadType::Map));
-            triggerUpdate();
+            view.invalidate();
         });
-    }
-}
-
-void Map::update() {
-    assert(Environment::currentlyOn(ThreadType::Map));
-
-    if (state.hasSize()) {
-        prepare();
     }
 }
 
@@ -771,29 +769,17 @@ void Map::loadStyleJSON(const std::string& json, const std::string& base) {
     for (const auto& source : style->sources) {
         source->load(getAccessToken(), *env, [this]() {
             assert(Environment::currentlyOn(ThreadType::Map));
-            triggerUpdate();
+            view.invalidate();
         });
     }
 
-    triggerUpdate(Update::Zoom);
+    view.invalidate();
 }
 
-void Map::prepare() {
+void Map::prepare(UpdateType u) {
     assert(Environment::currentlyOn(ThreadType::Map));
 
-    const auto now = Clock::now();
-    data->setAnimationTime(now);
-
-    auto u = updated.exchange(static_cast<UpdateType>(Update::Nothing)) |
-             transform.updateTransitions(now);
-
-    if (!style) {
-        u |= static_cast<UpdateType>(Update::StyleInfo);
-    }
-
-    state = transform.currentState();
-
-    if (u & static_cast<UpdateType>(Update::StyleInfo)) {
+    if (!style || u & static_cast<UpdateType>(Update::StyleInfo)) {
         reloadStyle();
     }
 
@@ -803,14 +789,10 @@ void Map::prepare() {
     }
 
     if (u & static_cast<UpdateType>(Update::RenderStill)) {
-        // Triggers a view resize.
-        view.discard();
-
         // Whenever we trigger an image render, we are unrefing all async handles so the loop will
         // eventually terminate. However, it'll stay alive as long as there are pending requests
         // (like work requests or HTTP requests).
         asyncTerminate->unref();
-        asyncUpdate->unref();
         asyncInvoke->unref();
     }
 
@@ -823,10 +805,11 @@ void Map::prepare() {
             style->cascade(data->getClasses());
         }
 
-        if (u & static_cast<UpdateType>(Update::StyleInfo) ||
+        if (!style->isInitialized() ||
+            u & static_cast<UpdateType>(Update::StyleInfo) ||
             u & static_cast<UpdateType>(Update::Classes) ||
             u & static_cast<UpdateType>(Update::Zoom)) {
-            style->recalculate(state.getNormalizedZoom(), now);
+            style->recalculate(state.getNormalizedZoom(), data->getAnimationTime());
         }
 
         // Allow the sprite atlas to potentially pull new sprite images if needed.
@@ -834,17 +817,16 @@ void Map::prepare() {
         spriteAtlas->setSprite(getSprite());
 
         updateTiles();
-    }
 
-    if (mode == Mode::Continuous) {
-        view.invalidate();
+        if (style->hasTransitions()) {
+            view.invalidate();
+        }
     }
 }
 
 void Map::render() {
+    fprintf(stderr, "render\n");
     assert(Environment::currentlyOn(ThreadType::Map));
-
-    view.discard();
 
     // Cleanup OpenGL objects that we abandoned since the last render call.
     env->performCleanup();
@@ -855,11 +837,6 @@ void Map::render() {
     painter->render(*style, state, data->getAnimationTime());
 
     view.swap();
-
-    // Schedule another rerender when we definitely need a next frame.
-    if (transform.needsTransition() || style->hasTransitions()) {
-        triggerUpdate();
-    }
 }
 
 void Map::setSourceTileCacheSize(size_t size) {
