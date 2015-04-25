@@ -222,8 +222,19 @@ mbgl::DefaultFileSource *mbglFileSource = nullptr;
     
     // metrics: initial setup
     NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"];
-    NSString *appVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+
     if (appName != nil) [MGLMapboxEvents setAppName:appName];
+
+    NSString *shortVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSString *buildVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+
+    NSMutableString *appVersion = [shortVersion mutableCopy];
+    if ( ! [buildVersion isEqualToString:shortVersion])
+    {
+        [appVersion appendString:@"/"];
+        [appVersion appendString:buildVersion];
+    }
+
     if (appVersion != nil) [MGLMapboxEvents setAppVersion:appVersion];
 
     // create GL view
