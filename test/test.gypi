@@ -62,7 +62,6 @@
         'storage/file_reading.cpp',
         'storage/http_cancel.cpp',
         'storage/http_coalescing.cpp',
-        'storage/http_environment.cpp',
         'storage/http_error.cpp',
         'storage/http_header_parsing.cpp',
         'storage/http_load.cpp',
@@ -72,15 +71,18 @@
       ],
       'libraries': [
         '<@(uv_static_libs)',
+        '<@(sqlite3_static_libs)',
       ],
       'variables': {
         'cflags_cc': [
           '<@(uv_cflags)',
           '<@(opengl_cflags)',
           '<@(boost_cflags)',
+          '<@(sqlite3_cflags)',
         ],
         'ldflags': [
           '<@(uv_ldflags)',
+          '<@(sqlite3_ldflags)',
         ],
       },
       'conditions': [
