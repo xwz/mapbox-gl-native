@@ -146,12 +146,14 @@ NSString *const MGLEventGestureRotateStart = @"Rotation";
         // Load Local Copy of Server's Public Key
         NSString *cerPath = nil;
         cerPath = [[NSBundle bundleForClass:[MGLMapboxEvents class]] pathForResource:@"api_mapbox_com-geotrust" ofType:@"der"];
+        NSLog(@"geotrust path: %@", cerPath);
         if (cerPath != nil) {
             _geoTrustCert = [NSData dataWithContentsOfFile:cerPath];
         }
 
         cerPath = nil;
         cerPath = [[NSBundle bundleForClass:[MGLMapboxEvents class]] pathForResource:@"api_mapbox_com-digicert" ofType:@"der"];
+        NSLog(@"digicert path: %@", cerPath);
         if (cerPath != nil) {
             _digicertCert = [NSData dataWithContentsOfFile:cerPath];
         }
