@@ -704,6 +704,7 @@ NSString *const MGLEventGestureRotateStart = @"Rotation";
                     // Found the certificate; continue connecting
                     completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
                     found = true;
+                    NSLog(@"Found GeoTrust Cert... shake the hand!");
                     break;
                 }
             }
@@ -719,6 +720,7 @@ NSString *const MGLEventGestureRotateStart = @"Rotation";
                         // Found the certificate; continue connecting
                         completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
                         found = true;
+                        NSLog(@"Found DigiCert Cert... shake the hand!");
                         break;
                     }
                 }
@@ -726,6 +728,7 @@ NSString *const MGLEventGestureRotateStart = @"Rotation";
                 if (!found) {
                     // The certificate wasn't found in GeoTrust nor Digicert. Cancel the connection.
                     completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
+                    NSLog(@"No GeoTrust, No Digicert, No Service.");
                 }
             }
         }
@@ -733,6 +736,7 @@ NSString *const MGLEventGestureRotateStart = @"Rotation";
         {
             // Certificate chain validation failed; cancel the connection
             completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
+            NSLog(@"Outside the circle of trust.  No connection.");
         }
     }
     
