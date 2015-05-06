@@ -4,6 +4,7 @@
 #include <mbgl/util/rect.hpp>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 #include <map>
 
@@ -55,6 +56,19 @@ public:
 };
 
 typedef std::vector<PositionedGlyph> Shaping;
+
+
+class SDFGlyph {
+public:
+    uint32_t id = 0;
+
+    // A signed distance field of the glyph with a border of 3 pixels.
+    std::string bitmap;
+
+    // Glyph metrics
+    GlyphMetrics metrics;
+};
+
 }
 
 #endif
