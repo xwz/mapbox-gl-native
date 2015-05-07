@@ -385,7 +385,8 @@ void Source::update(MapData& data,
                     GlyphStore& glyphStore,
                     SpriteAtlas& spriteAtlas,
                     util::ptr<Sprite> sprite,
-                    TexturePool& texturePool) {
+                    TexturePool& texturePool,
+                    bool shouldReparsePartialTiles) {
     if (!loaded || data.getAnimationTime() <= updated) {
         return;
     }
@@ -408,7 +409,8 @@ void Source::update(MapData& data,
 
         switch (state) {
         case TileData::State::partial:
-            handlePartialTile(id, style.workers);
+            if (shouldReparsePartialTiles)
+                handlePartialTile(id, style.workers);
             break;
         case TileData::State::invalid:
             state = addTile(data, transformState, style, glyphAtlas, glyphStore,
