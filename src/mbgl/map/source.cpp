@@ -233,7 +233,7 @@ void Source::handlePartialTile(const TileID &id, Worker &worker) {
         return;
     }
 
-    auto callback = std::bind(&Source::emitTileLoaded, this);
+    auto callback = std::bind(&Source::emitTileLoaded, this, false);
     data->reparse(worker, callback);
 }
 
@@ -274,7 +274,7 @@ TileData::State Source::addTile(MapData& data,
         new_tile.data = cache.get(normalized_id.to_uint64());
     }
 
-    auto callback = std::bind(&Source::emitTileLoaded, this);
+    auto callback = std::bind(&Source::emitTileLoaded, this, true);
     if (!new_tile.data) {
         // If we don't find working tile data, we're just going to load it.
         if (info.type == SourceType::Vector) {
@@ -525,9 +525,9 @@ void Source::emitSourceLoaded() {
     }
 }
 
-void Source::emitTileLoaded() {
+void Source::emitTileLoaded(bool isNewTile) {
     if (observer_) {
-        observer_->onTileLoaded();
+        observer_->onTileLoaded(isNewTile);
     }
 }
 
