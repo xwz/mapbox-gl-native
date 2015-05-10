@@ -651,10 +651,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
 
 #pragma mark - Life Cycle -
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-
-- (void)sleepGL:(NSNotification *)notification
+- (void)sleepGL:(__unused NSNotification *)notification
 {
     MGLAssertIsMainThread();
 
@@ -688,7 +685,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     }
 }
 
-- (void)wakeGL:(NSNotification *)notification
+- (void)wakeGL:(__unused NSNotification *)notification
 {
     MGLAssertIsMainThread();
 
@@ -720,19 +717,15 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
 
 #pragma mark - Gestures -
 
-- (void)handleCompassTapGesture:(id)sender
+- (void)handleCompassTapGesture:(__unused id)sender
 {
     [self resetNorthAnimated:YES];
 
     if (self.userTrackingMode == MGLUserTrackingModeFollowWithHeading) self.userTrackingMode = MGLUserTrackingModeFollow;
 }
 
-#pragma clang diagnostic pop
-
-- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+- (void)touchesBegan:(__unused NSSet *)touches withEvent:(__unused UIEvent *)event
 {
-    (void)touches;
-    (void)event;
     _mbglMap->cancelTransitions();
     _mbglMap->setGestureInProgress(false);
     self.animatingGesture = NO;
@@ -1268,15 +1261,10 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return [NSSet setWithObject:@"allowsRotating"];
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-
-- (void)showAttribution:(id)sender
+- (void)showAttribution:(__unused id)sender
 {
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://www.mapbox.com/about/maps/"]];
 }
-
-#pragma clang diagnostic pop
 
 - (void)setDebugActive:(BOOL)debugActive
 {
@@ -2000,10 +1988,8 @@ CLLocationCoordinate2D latLngToCoordinate(mbgl::LatLng latLng)
     }
 }
 
-- (void)locationManager:(CLLocationManager *)manager didUpdateToLocation:(CLLocation *)newLocation fromLocation:(CLLocation *)oldLocation
+- (void)locationManager:(__unused CLLocationManager *)manager didUpdateToLocation:(CLLocation *)newLocation fromLocation:(CLLocation *)oldLocation
 {
-    (void)manager;
-
     if ( ! _showsUserLocation || ! newLocation || ! CLLocationCoordinate2DIsValid(newLocation.coordinate)) return;
 
     if ([newLocation distanceFromLocation:oldLocation] || ! oldLocation)
@@ -2076,19 +2062,15 @@ CLLocationCoordinate2D latLngToCoordinate(mbgl::LatLng latLng)
 
 - (BOOL)locationManagerShouldDisplayHeadingCalibration:(CLLocationManager *)manager
 {
-    (void)manager;
-
-    if (self.displayHeadingCalibration) [self.locationManager performSelector:@selector(dismissHeadingCalibrationDisplay)
-                                                                   withObject:nil
-                                                                   afterDelay:10.0];
+    if (self.displayHeadingCalibration) [manager performSelector:@selector(dismissHeadingCalibrationDisplay)
+                                                      withObject:nil
+                                                      afterDelay:10.0];
 
     return self.displayHeadingCalibration;
 }
 
-- (void)locationManager:(CLLocationManager *)manager didUpdateHeading:(CLHeading *)newHeading
+- (void)locationManager:(__unused CLLocationManager *)manager didUpdateHeading:(CLHeading *)newHeading
 {
-    (void)manager;
-
     if ( ! _showsUserLocation || self.pan.state == UIGestureRecognizerStateBegan || newHeading.headingAccuracy < 0) return;
 
     self.userLocation.heading = newHeading;
@@ -2108,10 +2090,8 @@ CLLocationCoordinate2D latLngToCoordinate(mbgl::LatLng latLng)
     }
 }
 
-- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
+- (void)locationManager:(__unused CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
 {
-    (void)manager;
-
     if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted)
     {
         self.userTrackingMode  = MGLUserTrackingModeNone;
@@ -2119,10 +2099,8 @@ CLLocationCoordinate2D latLngToCoordinate(mbgl::LatLng latLng)
     }
 }
 
-- (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error
+- (void)locationManager:(__unused CLLocationManager *)manager didFailWithError:(NSError *)error
 {
-    (void)manager;
-
     if ([error code] == kCLErrorDenied)
     {
         self.userTrackingMode  = MGLUserTrackingModeNone;
