@@ -43,26 +43,28 @@ public:
         async.send();
     }
 
+    // Return a function that always calls the given function on the current RunLoop.
+    template <class... Args>
+    auto bind(std::function<void (Args...)> fn) {
+        return [this, fn = std::move(fn)] (Args&&... args) mutable {
+            invoke(std::move(fn), std::move(args)...);
+        };
+    }
+
     // Invoke fn() in the runloop thread, then invoke callback(result) in the current thread.
     template <class Fn, class R>
-    void invokeWithResult(Fn&& fn, std::function<void (R)>&& callback) {
-        RunLoop* outer = current.get();
-        assert(outer);
-
-        invoke([fn = std::move(fn), callback = std::move(callback), outer] () mutable {
-            outer->invoke(std::move(callback), fn());
+    void invokeWithResult(Fn&& fn, std::function<void (R)> callback) {
+        invoke([fn = std::move(fn), callback = current.get()->bind(callback)] () mutable {
+            callback(fn());
         });
     }
 
     // Invoke fn() in the runloop thread, then invoke callback() in the current thread.
     template <class Fn>
-    void invokeWithResult(Fn&& fn, std::function<void ()>&& callback) {
-        RunLoop* outer = current.get();
-        assert(outer);
-
-        invoke([fn = std::move(fn), callback = std::move(callback), outer] () mutable {
+    void invokeWithResult(Fn&& fn, std::function<void ()> callback) {
+        invoke([fn = std::move(fn), callback = current.get()->bind(callback)] () mutable {
             fn();
-            outer->invoke(std::move(callback));
+            callback();
         });
     }
 
