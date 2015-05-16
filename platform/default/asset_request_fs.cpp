@@ -5,7 +5,7 @@
 #include <mbgl/util/util.hpp>
 #include <mbgl/util/url.hpp>
 #include <mbgl/util/uv.hpp>
-
+#include <mbgl/platform/log.hpp>
 #include <uv.h>
 
 #include <cassert>
@@ -65,6 +65,7 @@ AssetRequest::AssetRequest(const Resource& resource_, Callback callback_, uv_loo
         path = assetRoot + "/" + mbgl::util::percentDecode(url.substr(8));
     }
 
+    //Log::Debug(Event::General, "asset = %s", path.c_str());
     uv_fs_open(loop, &req, path.c_str(), O_RDONLY, S_IRUSR, fileOpened);
 }
 

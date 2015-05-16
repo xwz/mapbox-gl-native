@@ -123,6 +123,7 @@ void DefaultFileSource::Impl::startRealRequest(const Resource& resource, std::sh
     };
 
     if (algo::starts_with(resource.url, "asset://")) {
+      Log::Debug(Event::General, "file %s", resource.url.c_str());
         request->request = assetContext->createRequest(resource, callback, loop, assetRoot);
     } else {
         Log::Debug(Event::General, "real request %s", resource.url.c_str());

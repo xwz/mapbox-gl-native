@@ -2,6 +2,7 @@
 
 #import <mbgl/ios/MGLMapView.h>
 #import <mbgl/ios/private/MGLMapView_Private.h>
+#import <mbgl/ios/MGLAccountManager.h>
 
 #include "locations.hpp"
 
@@ -20,10 +21,12 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-
-    NSURL* url = [[NSURL alloc] initWithString:@"asset://styles/mapbox-streets-v7.json"];
+  [MGLAccountManager setMapboxMetricsEnabledSettingShownInApp:YES];
+  NSURL* url = [[NSURL alloc] initWithString:@"asset://styles/mapbox-streets-v7.json"];
     self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds accessToken:nil styleURL:url];
-    self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+//    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_19.db"];
+
+  self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.mapView.delegate = self;
     self.mapView.zoomEnabled = NO;
     self.mapView.scrollEnabled = NO;
