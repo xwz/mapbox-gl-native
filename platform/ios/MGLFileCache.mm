@@ -1,17 +1,19 @@
 #import "MGLFileCache.h"
+#include <mbgl/storage/sqlite_cache.hpp>
+#include <mbgl/storage/mbtiles_source.hpp>
 
 @interface MGLFileCache ()
 
 @property (nonatomic) MGLFileCache *sharedInstance;
-@property (nonatomic) mbgl::SQLiteCache *sharedCache;
+@property (nonatomic) mbgl::FileCache *sharedCache;
 @property (nonatomic) NSHashTable *retainers;
 
 @end
 
 @implementation MGLFileCache
 
-const std::string &defaultCacheDatabasePath() {
-    static const std::string path = []() -> std::string {
+const std::string &fileInCacheDirectory(NSString *filename) {
+    static const std::string path = [filename]() -> std::string {
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
         if ([paths count] == 0) {
             // Disable the cache if we don't have a location to write.
@@ -19,9 +21,17 @@ const std::string &defaultCacheDatabasePath() {
         }
 
         NSString *libraryDirectory = [paths objectAtIndex:0];
-        return [[libraryDirectory stringByAppendingPathComponent:@"cache.db"] UTF8String];
+        return [[libraryDirectory stringByAppendingPathComponent:filename] UTF8String];
     }();
     return path;
+}
+
+const std::string &fileInBundle(NSString *filename) {
+  static const std::string path = [filename]() -> std::string {
+    NSURL *res = [[NSBundle mainBundle] URLForResource:filename withExtension:nil];
+    return [[res absoluteString] UTF8String];
+  }();
+  return path;
 }
 
 - (instancetype)init {
@@ -53,14 +63,27 @@ const std::string &defaultCacheDatabasePath() {
     [self teardown];
 }
 
-+ (mbgl::SQLiteCache *)obtainSharedCacheWithObject:(NSObject *)object {
-    return [[MGLFileCache sharedInstance] obtainSharedCacheWithObject:object];
++ (mbgl::FileCache *)obtainSharedMBTilesSource:(NSString *)db withObject:(NSObject *)object {
+  return [[MGLFileCache sharedInstance] obtainSharedMBTilesSource:db withObject:object];
 }
 
-- (mbgl::SQLiteCache *)obtainSharedCacheWithObject:(NSObject *)object {
+- (mbgl::FileCache *)obtainSharedMBTilesSource:(NSString *)db withObject:(NSObject *)object {
+  assert([[NSThread currentThread] isMainThread]);
+  if (!self.sharedCache) {
+    self.sharedCache = new mbgl::MBTilesSource(fileInBundle(db));
+  }
+  [self.retainers addObject:object];
+  return self.sharedCache;
+}
+
++ (mbgl::FileCache *)obtainSharedCacheWithObject:(NSObject *)object {
+  return [[MGLFileCache sharedInstance] obtainSharedCache:@"cache.db" withObject:object];
+}
+
+- (mbgl::FileCache *)obtainSharedCache:(NSString *)db withObject:(NSObject *)object {
     assert([[NSThread currentThread] isMainThread]);
     if (!self.sharedCache) {
-        self.sharedCache = new mbgl::SQLiteCache(defaultCacheDatabasePath());
+        self.sharedCache = new mbgl::SQLiteCache(fileInCacheDirectory(db));
     }
     [self.retainers addObject:object];
     return self.sharedCache;

@@ -52,7 +52,9 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
 {
     [super viewDidLoad];
 
-    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds];
+    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_19.db"];
+//    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds];
+
     self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.mapView.showsUserLocation = YES;
     self.mapView.delegate = self;
@@ -81,6 +83,12 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
 
     settings = new mbgl::Settings_NSUserDefaults();
     [self restoreState:nil];
+
+  [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(-33.8650, 151.2094)
+                          zoomLevel:12
+                           animated:NO];
+
+  [self.mapView setDirection:0];
 }
 
 #pragma clang diagnostic push
@@ -212,8 +220,8 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
             {
                 [self.mapView addAnnotations:annotations];
 
-                [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(38.904722, -77.016389)
-                                        zoomLevel:10
+                [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(-33.8650, 151.2094)
+                                        zoomLevel:12
                                          animated:NO];
 
                 [self.mapView setDirection:0];

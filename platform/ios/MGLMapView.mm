@@ -90,7 +90,7 @@ static NSURL *MGLURLForBundledStyleNamed(NSString *styleName)
 {
     mbgl::Map *_mbglMap;
     MBGLView *_mbglView;
-    mbgl::DefaultFileSource *_mbglFileSource;
+    mbgl::FileSource *_mbglFileSource;
 
     BOOL _isTargetingInterfaceBuilder;
     CLLocationDegrees _pendingLatitude;
@@ -136,6 +136,18 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     }
 
     return self;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame withMBTilesFile:(NSString *)mbtiles {
+  if (self = [super initWithFrame:frame]) {
+    _mbglFileSource = new mbgl::DefaultFileSource([MGLFileCache obtainSharedMBTilesSource:mbtiles withObject:self]);
+    if ([self commonInit]) {
+      self.accessToken = [MGLAccountManager accessToken];;
+      self.styleURL = nil;
+    }
+  }
+
+  return self;
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder
@@ -264,7 +276,9 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     // setup mbgl map
     //
     _mbglView = new MBGLView(self);
-    _mbglFileSource = new mbgl::DefaultFileSource([MGLFileCache obtainSharedCacheWithObject:self]);
+    if (_mbglFileSource == nil) {
+        _mbglFileSource = new mbgl::DefaultFileSource([MGLFileCache obtainSharedCacheWithObject:self]);
+    }
 
     // Start paused on the IB canvas
     _mbglMap = new mbgl::Map(*_mbglView, *_mbglFileSource, mbgl::MapMode::Continuous);

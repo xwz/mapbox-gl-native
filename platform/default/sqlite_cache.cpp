@@ -6,6 +6,7 @@
 #include <mbgl/util/io.hpp>
 #include <mbgl/util/thread.hpp>
 #include <mbgl/platform/log.hpp>
+#include <mbgl/util/stopwatch.hpp>
 
 #include "sqlite3.hpp"
 #include <sqlite3.h>
@@ -153,9 +154,12 @@ std::unique_ptr<Response> SQLiteCache::Impl::get(const Resource &resource) {
         } else {
             getStmt->reset();
         }
+        //util::stopwatch stopwatch("cache", Event::Database);
 
         const std::string unifiedURL = unifyMapboxURLs(resource.url);
         getStmt->bind(1, unifiedURL.c_str());
+        Log::Debug(Event::Database, "db cache: %s", unifiedURL.c_str());
+
         if (getStmt->run()) {
             // There is data.
             auto response = util::make_unique<Response>();

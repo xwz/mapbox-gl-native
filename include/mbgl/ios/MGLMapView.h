@@ -32,11 +32,14 @@ IB_DESIGNABLE
 - (instancetype)initWithFrame:(CGRect)frame accessToken:(NSString *)accessToken;
 
 /** Initialize a map view with a given frame, access token, and style URL.
- *   @param frame The frame with which to initialize the map view.
+ *   @param frame The frame with which to initialize  the map view.
  *   @param accessToken A Mapbox API access token.
  *   @param styleURL The map style URL to use. Can be either an HTTP/HTTPS URL or a Mapbox map ID style URL (`mapbox://<user.style>`).
  *   @return An initialized map view, or `nil` if the map view was unable to be initialized. */
 - (instancetype)initWithFrame:(CGRect)frame accessToken:(NSString *)accessToken styleURL:(NSURL *)styleURL;
+
+- (instancetype)initWithFrame:(CGRect)frame withMBTilesFile:(NSString *)mbtiles;
+
 
 #pragma mark - Authorizing Access
 

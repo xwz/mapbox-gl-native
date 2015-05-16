@@ -4,7 +4,8 @@
 
 @interface MGLFileCache : NSObject
 
-+ (mbgl::SQLiteCache *)obtainSharedCacheWithObject:(NSObject *)object;
++ (mbgl::FileCache *)obtainSharedMBTilesSource:(NSString *)db withObject:(NSObject *)object;
++ (mbgl::FileCache *)obtainSharedCacheWithObject:(NSObject *)object;
 + (void)releaseSharedCacheForObject:(NSObject *)object;
 
 @end

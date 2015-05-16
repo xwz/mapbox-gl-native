@@ -5,6 +5,7 @@
 #include <mbgl/storage/response.hpp>
 #include <mbgl/util/chrono.hpp>
 #include <mbgl/util/compression.hpp>
+#include <mbgl/util/stopwatch.hpp>
 
 #include "sqlite3.hpp"
 #include <sqlite3.h>
@@ -51,6 +52,7 @@ namespace mbgl {
       auto response = util::make_unique<Response>();
       response->status = Response::Status::Successful;
       response->expires = now + 100000;
+      //util::stopwatch stopwatch("mbtiles", Event::Database);
       try {
         // This is called in the SQLite event loop.
         if (!db) {
@@ -70,6 +72,8 @@ namespace mbgl {
         if (getStmt->run()) {
           response->data = util::decompress(getStmt->get<std::string>(0));
           Log::Debug(Event::Database, "mbtiles (%d, %d, %d [%d]) => %d", resource.z, resource.x, resource.y, y, response->data.length());
+        } else {
+          Log::Debug(Event::Database, "Not found mbtiles (%d, %d, %d [%d])", resource.z, resource.x, resource.y, y);
         }
       }  catch (mapbox::sqlite::Exception& ex) {
         Log::Error(Event::Database, ex.code, ex.what());
