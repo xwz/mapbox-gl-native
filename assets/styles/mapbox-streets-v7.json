@@ -4495,7 +4495,7 @@
         "type": "symbol",
         "source": "composite",
         "source-layer": "housenum_label",
-        "minzoom": 17,
+        "minzoom": 15.5,
         "maxzoom": 22,
         "interactive": true,
         "layout": {
