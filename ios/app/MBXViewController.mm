@@ -55,6 +55,10 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
     self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_295.db"];
 //    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds];
 
+    [self.mapView setMinScale:pow(2, 12)];
+    [self.mapView setBoundsSouthWest:CLLocationCoordinate2DMake(59.85585085709834, 10.469970703125)
+                           NorthEast:CLLocationCoordinate2DMake(60.235039190740146, 11.13739013671875)];
+  
     self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.mapView.showsUserLocation = YES;
     self.mapView.delegate = self;

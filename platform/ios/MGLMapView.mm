@@ -1451,6 +1451,18 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     [self setZoomLevel:zoomLevel animated:NO];
 }
 
+- (void)setMinScale:(double)scale {
+  _mbglMap->setMinScale(scale);
+}
+
+- (void)setMaxScale:(double)scale {
+  _mbglMap->setMaxScale(scale);
+}
+
+- (void)setBoundsSouthWest:(CLLocationCoordinate2D)sw NorthEast:(CLLocationCoordinate2D)ne {
+  _mbglMap->setBoundingBox({coordinateToLatLng(sw), coordinateToLatLng(ne)});
+}
+
 - (void)zoomToSouthWestCoordinate:(CLLocationCoordinate2D)southWestCoordinate northEastCoordinate:(CLLocationCoordinate2D)northEastCoordinate animated:(BOOL)animated
 {
     // NOTE: does not disrupt tracking mode

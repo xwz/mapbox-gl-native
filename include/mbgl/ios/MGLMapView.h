@@ -137,6 +137,12 @@ IB_DESIGNABLE
 /** Resets the map rotation to a northern heading. */
 - (IBAction)resetNorth;
 
+- (void)setMinScale:(double)scale;
+
+- (void)setMaxScale:(double)scale;
+
+- (void)setBoundsSouthWest:(CLLocationCoordinate2D)sw NorthEast:(CLLocationCoordinate2D)ne;
+
 #pragma mark - Converting Map Coordinates
 
 /** @name Converting Map Coordinates */
