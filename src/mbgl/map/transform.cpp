@@ -7,6 +7,7 @@
 #include <mbgl/util/unitbezier.hpp>
 #include <mbgl/util/interpolate.hpp>
 #include <mbgl/platform/platform.hpp>
+#include <mbgl/platform/log.hpp>
 
 #include <cstdio>
 
@@ -48,7 +49,7 @@ bool Transform::resize(const uint16_t w, const uint16_t h, const float ratio,
         current.pixelRatio = final.pixelRatio = ratio;
         current.framebuffer[0] = final.framebuffer[0] = fb_w;
         current.framebuffer[1] = final.framebuffer[1] = fb_h;
-        constrain(current.scale, current.y);
+        constrain(current.scale, current.x, current.y);
 
         view.notifyMapChange(MapChangeRegionDidChange);
 
@@ -80,7 +81,7 @@ void Transform::_moveBy(const double dx, const double dy, const Duration duratio
     final.x = current.x + std::cos(current.angle) * dx + std::sin(current.angle) * dy;
     final.y = current.y + std::cos(current.angle) * dy + std::sin(-current.angle) * dx;
 
-    constrain(final.scale, final.y);
+    constrain(final.scale, final.x, final.y);
 
     if (duration == Duration::zero()) {
         current.x = final.x;
@@ -202,13 +203,21 @@ double Transform::getScale() const {
 double Transform::getMinZoom() const {
     double test_scale = current.scale;
     double test_y = current.y;
-    constrain(test_scale, test_y);
+    double test_x = current.x;
+    constrain(test_scale, test_x, test_y);
 
     return std::log2(std::fmin(min_scale, test_scale));
 }
 
 double Transform::getMaxZoom() const {
     return std::log2(max_scale);
+}
+
+void Transform::setMinScale(double scale) {
+  min_scale = scale;
+}
+void Transform::setMaxScale(double scale) {
+  max_scale = scale;
 }
 
 void Transform::_setScale(double new_scale, double cx, double cy, const Duration duration) {
@@ -256,7 +265,7 @@ void Transform::_setScaleXY(const double new_scale, const double xn, const doubl
     final.x = xn;
     final.y = yn;
 
-    constrain(final.scale, final.y);
+    constrain(final.scale, final.x, final.y);
 
     if (duration == Duration::zero()) {
         current.scale = final.scale;
@@ -296,17 +305,38 @@ void Transform::_setScaleXY(const double new_scale, const double xn, const doubl
 
 #pragma mark - Constraints
 
-void Transform::constrain(double& scale, double& y) const {
-    // Constrain minimum zoom to avoid zooming out far enough to show off-world areas.
-    if (scale < (current.height / util::tileSize)) scale = (current.height / util::tileSize);
-
-    // Constrain min/max vertical pan to avoid showing off-world areas.
-    double max_y = ((scale * util::tileSize) - current.height) / 2;
-
-    if (y > max_y) y = max_y;
-    if (y < -max_y) y = -max_y;
+void Transform::setBoundingBox(const mbgl::LatLngBounds box) {
+  bounds = box;
 }
 
+vec2<double> Transform::projectPoint(double scale, const LatLng& point) const {
+  // Project a coordinate into unit space in a square map.
+  const double m = 1 - 1e-15;
+  const double f = std::fmin(std::fmax(std::sin(util::DEG2RAD * point.latitude), -m), m);
+
+  double x = -point.longitude * ((scale * util::tileSize) / 360);
+  double y = 0.5 * ((scale * util::tileSize) / util::M2PI) * std::log((1 + f) / (1 - f));
+
+  return { x, y };
+}
+
+void Transform::constrain(double& scale, double &x, double& y) const {
+  if (scale < (current.height / util::tileSize)) scale = (current.height / util::tileSize);
+
+  vec2<double> sw = projectPoint(scale, bounds.sw);
+  vec2<double> ne = projectPoint(scale, bounds.ne);
+  double min_x = std::min(sw.x, ne.x), max_x = std::max(sw.x, ne.x);
+  double min_y = std::min(sw.y, ne.y), max_y = std::max(sw.y, ne.y);
+
+  //Log::Info(Event::General, "p(%0.0f, %0.0f), x[%0.0f,%0.0f], y[%0.0f,%0.0f]", x, y, min_x, max_x, min_y, max_y);
+
+  if (y > max_y) y = max_y;
+  if (y < min_y) y = min_y;
+  if (x > max_x) x = max_x;
+  if (x < min_x) x = min_x;
+
+  //Log::Info(Event::General, "p(%0.0f, %0.0f)", x, y);
+}
 #pragma mark - Angle
 
 void Transform::rotateBy(const double start_x, const double start_y, const double end_x,

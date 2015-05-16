@@ -86,6 +86,9 @@ public:
     void resetZoom();
     double getMinZoom() const;
     double getMaxZoom() const;
+    void setMinScale(double scale);
+    void setMaxScale(double scale);
+    void setBoundingBox(LatLngBounds);
 
     // Rotation
     void rotateBy(double sx, double sy, double ex, double ey, Duration = Duration::zero());

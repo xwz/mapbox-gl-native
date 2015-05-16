@@ -52,7 +52,7 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
 {
     [super viewDidLoad];
 
-    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_19.db"];
+    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_295.db"];
 //    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds];
 
     self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -84,8 +84,8 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
     settings = new mbgl::Settings_NSUserDefaults();
     [self restoreState:nil];
 
-  [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(-33.8650, 151.2094)
-                          zoomLevel:12
+  [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(59.9134, 10.7427)
+                          zoomLevel:13.5
                            animated:NO];
 
   [self.mapView setDirection:0];

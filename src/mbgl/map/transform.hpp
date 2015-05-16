@@ -42,6 +42,10 @@ public:
     double getMinZoom() const;
     double getMaxZoom() const;
 
+    void setMinScale(double scale);
+    void setMaxScale(double scale);
+    void setBoundingBox(const LatLngBounds);
+  
     // Angle
     void rotateBy(double sx, double sy, double ex, double ey, Duration = Duration::zero());
     void setAngle(double angle, Duration = Duration::zero());
@@ -68,7 +72,8 @@ private:
     void _setScaleXY(double new_scale, double xn, double yn, Duration = Duration::zero());
     void _setAngle(double angle, Duration = Duration::zero());
 
-    void constrain(double& scale, double& y) const;
+    vec2<double> projectPoint(const double scale, const LatLng&) const;
+    void constrain(double& scale, double& x, double& y) const;
 
     View &view;
 
@@ -83,8 +88,10 @@ private:
     TransformState final;
 
     // Limit the amount of zooming possible on the map.
-    const double min_scale = std::pow(2, 0);
-    const double max_scale = std::pow(2, 18);
+    double min_scale = std::pow(2, 0);
+    double max_scale = std::pow(2, 18);
+
+    LatLngBounds bounds;
 
     void startTransition(std::function<Update(double)> frame,
                          std::function<void()> finish,

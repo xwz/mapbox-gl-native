@@ -105,9 +105,13 @@ const std::string &fileInApplicationSupport(NSString *filename) {
 int main() {
     GLFWView view;
 
-    mbgl::MBTilesSource cache(fileInApplicationSupport(@"map_19.db"));
+    mbgl::MBTilesSource cache(fileInApplicationSupport(@"map_295.db"));
     mbgl::DefaultFileSource fileSource(&cache);
     mbgl::Map map(view, fileSource);
+    map.setMinScale(std::pow(2, 12));
+
+    map.setBoundingBox(mbgl::LatLngBounds(mbgl::LatLng(59.85585085709834, 10.469970703125),
+                                          mbgl::LatLng(60.235039190740146, 11.13739013671875)));
 
     URLHandler *handler = [[URLHandler alloc] init];
     [handler setMap:&map];
@@ -123,7 +127,7 @@ int main() {
 
     // Load settings
     mbgl::Settings_NSUserDefaults settings;
-    map.setLatLngZoom(mbgl::LatLng(settings.latitude, settings.longitude), settings.zoom);
+    map.setLatLngZoom(mbgl::LatLng(59.9134, 10.7427), 13.5);
     map.setBearing(settings.bearing);
     map.setDebug(settings.debug);
 

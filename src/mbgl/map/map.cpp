@@ -129,6 +129,7 @@ void Map::setScale(double scale, double cx, double cy, Duration duration) {
 double Map::getScale() const {
     return data->transform.getScale();
 }
+  
 
 void Map::setZoom(double zoom, Duration duration) {
     data->transform.setZoom(zoom, duration);
@@ -156,6 +157,17 @@ double Map::getMaxZoom() const {
     return data->transform.getMaxZoom();
 }
 
+void Map::setMinScale(double scale) {
+  data->transform.setMinScale(scale);
+}
+
+void Map::setMaxScale(double scale) {
+  data->transform.setMaxScale(scale);
+}
+
+void Map::setBoundingBox(LatLngBounds box) {
+    data->transform.setBoundingBox(box);
+}
 
 #pragma mark - Size
 
