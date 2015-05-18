@@ -39,6 +39,9 @@ Request* DefaultFileSource::request(const Resource& resource,
                                     Callback callback) {
     assert(l);
     auto req = new Request(resource, l, std::move(callback));
+  /*if (resource.kind == Resource::Kind::Tile) {
+    Log::Info(Event::HttpRequest, "Loading %s", resource.url.c_str());
+  }*/
     thread->invoke(&Impl::add, req);
     return req;
 }

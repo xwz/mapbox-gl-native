@@ -10,6 +10,7 @@
 #include <mbgl/util/constants.hpp>
 #include <mbgl/util/std.hpp>
 #include <mbgl/style/style.hpp>
+#include <mbgl/util/stopwatch.hpp>
 
 #include <locale>
 
@@ -44,6 +45,9 @@ bool TileParser::obsolete() const {
 
 void TileParser::parse() {
     for (const auto& layer_desc : style.layers) {
+
+        //util::stopwatch stopwatch(layer_desc->id.c_str(), Event::ParseTile);
+
         // Cancel early when parsing.
         if (obsolete()) {
             return;

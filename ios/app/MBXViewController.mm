@@ -7,6 +7,7 @@
 #import <CoreLocation/CoreLocation.h>
 
 #import "MBXAnnotation.h"
+#import "MapDownloader.h"
 
 static UIColor *const kTintColor = [UIColor colorWithRed:0.120 green:0.550 blue:0.670 alpha:1.000];
 
@@ -48,16 +49,68 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
     return self;
 }
 
-- (void)viewDidLoad
-{
-    [super viewDidLoad];
+- (void)viewDidLoad {
+  self.title = self.city[@"Name"];
+  [self loadCityMap];
+}
 
-    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:@"tiles/map_295.db"];
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cityDownloaded:)
+                                               name:@"CityDownloaded"
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(downloadProgress:)
+                                               name:@"DownloadProgress"
+                                             object:nil];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+  [super viewDidDisappear:animated];
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+
+- (void)loadCityMap {
+  NSString *dbfile = [MapDownloader localMapDBFileForCity:self.city];
+  BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:dbfile];
+  if (fileExists) {
+    self.progress.hidden = YES;
+    [self loadMapForCity:self.city];
+  } else {
+    [MapDownloader downloadMapForCity:self.city];
+  }
+}
+
+- (void)cityDownloaded:(NSNotification *)notification {
+  NSDictionary *downloaded = [notification object];
+  NSLog(@"Downloaded city = %@", downloaded[@"Name"]);
+  if (downloaded != nil && [downloaded[@"ID"] isEqualToString:self.city[@"ID"]]) {
+    [self loadMapForCity:self.city];
+  }
+}
+
+- (void)downloadProgress:(NSNotification *)notification {
+  NSDictionary *info = notification.object;
+  if ([info[@"ID"] isEqualToString:self.city[@"ID"]]) {
+    NSNumber *progress = info[@"Progress"];
+    self.progress.progress = [progress floatValue];
+    self.progress.hidden = self.progress.progress >= 1.0;
+  } else {
+    self.progress.hidden = YES;
+  }
+}
+
+- (void)loadMapForCity:(NSDictionary *)city {
+    NSLog(@"city = %@", city);
+
+    NSString *db = [MapDownloader localMapDBFileForCity:city];
+
+    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds withMBTilesFile:db];
 //    self.mapView = [[MGLMapView alloc] initWithFrame:self.view.bounds];
 
     [self.mapView setMinScale:pow(2, 12)];
-    [self.mapView setBoundsSouthWest:CLLocationCoordinate2DMake(59.85585085709834, 10.469970703125)
-                           NorthEast:CLLocationCoordinate2DMake(60.235039190740146, 11.13739013671875)];
+    [self.mapView setBoundsSouthWest:[MapDownloader southWestCorner:city]
+                           NorthEast:[MapDownloader northEastCorner:city]];
   
     self.mapView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.mapView.showsUserLocation = YES;
@@ -65,9 +118,10 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
     [self.view addSubview:self.mapView];
 
     self.view.tintColor = kTintColor;
-    self.navigationController.navigationBar.tintColor = kTintColor;
+//    self.navigationController.navigationBar.tintColor = kTintColor;
     self.mapView.tintColor = kTintColor;
 
+  /*
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"settings.png"]
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:self
@@ -85,10 +139,11 @@ mbgl::Settings_NSUserDefaults *settings = nullptr;
                                                                              target:self
                                                                              action:@selector(locateUser)];
 
+   */
     settings = new mbgl::Settings_NSUserDefaults();
     [self restoreState:nil];
 
-  [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(59.9134, 10.7427)
+  [self.mapView setCenterCoordinate:[MapDownloader cityCentre:city]
                           zoomLevel:13.5
                            animated:NO];
 

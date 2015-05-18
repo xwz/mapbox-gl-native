@@ -70,7 +70,7 @@ const std::string &fileInBundle(NSString *filename) {
 - (mbgl::FileCache *)obtainSharedMBTilesSource:(NSString *)db withObject:(NSObject *)object {
   assert([[NSThread currentThread] isMainThread]);
   if (!self.sharedCache) {
-    self.sharedCache = new mbgl::MBTilesSource(fileInBundle(db));
+    self.sharedCache = new mbgl::MBTilesSource([db UTF8String]);
   }
   [self.retainers addObject:object];
   return self.sharedCache;

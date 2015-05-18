@@ -32,8 +32,10 @@
 	<string>(c) 2014 Mapbox</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>The map will be centered on the user's location.</string>
-	<key>UILaunchStoryboardName</key>
-	<string>Default</string>
+	<key>UIMainStoryboardFile</key>
+	<string>main</string>
+	<key>UIMainStoryboardFile~ipad</key>
+	<string>main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>

@@ -8,6 +8,7 @@
 #include <mbgl/platform/log.hpp>
 #include <mbgl/text/collision.hpp>
 #include <mbgl/util/pbf.hpp>
+#include <mbgl/util/stopwatch.hpp>
 
 using namespace mbgl;
 
@@ -40,7 +41,7 @@ void VectorTileData::parse() {
     if (getState() != State::loaded && getState() != State::partial) {
         return;
     }
-
+    util::stopwatch stopwatch("parse vector tile data", Event::Database);
     try {
         // Parsing creates state that is encapsulated in TileParser. While parsing,
         // the TileParser object writes results into this objects. All other state
